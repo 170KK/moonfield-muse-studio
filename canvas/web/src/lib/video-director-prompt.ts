@@ -365,9 +365,9 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
         const lockMatch = clean.match(/统一人物锁定[：:]\s*\n?([\s\S]*?)(?=\n(?:统一|【|S\d+|$))/);
         const charLines = lockMatch?.[1]
             ? lockMatch[1]
-                  .split(/\n+/)
+                  .split(/\n+|[；;]+/)
                   .map((l) => l.trim())
-                  .filter(Boolean)
+                  .filter((l) => l.length >= 2)
             : [];
         if (charLines.length > 0) {
             for (const line of charLines.slice(0, 6)) {
@@ -422,9 +422,9 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
         const lockPropMatch = clean.match(/统一道具锁定[：:]\s*\n?([\s\S]*?)(?=\n(?:统一|【|S\d+|$))/);
         const propLines = lockPropMatch?.[1]
             ? lockPropMatch[1]
-                  .split(/\n+/)
+                  .split(/\n+|[；;]+/)
                   .map((l) => l.trim())
-                  .filter(Boolean)
+                  .filter((l) => l.length >= 2)
             : [];
         if (propLines.length > 0) {
             for (const line of propLines.slice(0, 6)) {
