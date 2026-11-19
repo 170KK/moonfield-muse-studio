@@ -349,52 +349,103 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
         }
     }
 
-    // Also extract shared characters/scenes/props from script overview if still missing
+    // Also extract shared characters/scenes/props from script overview (including 统一人物锁定 / 统一道具锁定)
+    const detectedRatio = /9:16|竖屏/.test(clean) && !/16:9|横屏/.test(clean) ? "9:16 竖屏" : "16:9 横屏";
+    const detectedRatioEn = detectedRatio.startsWith("9:16") ? "9:16 vertical" : "16:9 widescreen";
+
     if (characters.length === 0) {
-        const charLine = clean.match(/(?:主角|人物|角色)[：:]\s*([^\n]+)/);
-        if (charLine?.[1]) {
-            const parts = charLine[1].split(/[、，,]/).map((s) => s.trim()).filter((s) => s && s.length <= 24);
-            for (const part of parts.slice(0, 4)) {
-                const name = part.replace(/^(?:优势格斗者|弱势者|主角|角色)\s*/, "").split(/[\s（(]/)[0].trim();
+        const lockMatch = clean.match(/统一人物锁定[：:]\s*\n?([\s\S]*?)(?=\n(?:统一|【|S\d+|$))/);
+        const charLines = lockMatch?.[1]
+            ? lockMatch[1]
+                  .split(/\n+/)
+                  .map((l) => l.trim())
+                  .filter(Boolean)
+            : [];
+        if (charLines.length > 0) {
+            for (const line of charLines.slice(0, 6)) {
+                const name = line.split(/[，,：:（(]/)[0].trim().slice(0, 16);
                 if (name && !seenNames.has(name)) {
                     seenNames.add(name);
                     characters.push({
                         name,
                         prompt: formatBilingualNodePrompt(
-                            `角色三视图与常用表情设定图（${name}）：纯白干净背景，左侧为正面、侧面、背面全身三视图，右侧为喜/怒/惊/痛等常用表情头像矩阵，同一张图内完整展示，五官发型服装材质前后严格一致，超写实细节，无文字无水印。`,
-                            `Character turnaround sheet & common expressions (${name}) on clean pure white background: full-body three-view turnaround (front, side, back) alongside a grid of common facial expressions (neutral, angry, shocked, pain) in one unified sheet, consistent facial features, hair and outfit, photorealistic, no text, no watermark.`,
+                            `角色三视图与常用表情设定图（${name}）：纯白干净背景，左侧为正面、侧面、背面全身三视图，右侧为喜/怒/惊/痛等常用表情头像矩阵，同一张图内完整展示；外貌与服装锁定：${line}；五官可辨不过度锐化，自然皮肤质感，无文字无水印。`,
+                            `Character turnaround sheet & common expressions (${name}) on clean pure white background: full-body three-view turnaround (front, side, back) alongside a common facial expressions grid in one unified sheet; locked appearance & outfit: ${line}; natural skin texture, photorealistic, no text, no watermark.`,
                         ),
                     });
+                }
+            }
+        } else {
+            const charLine = clean.match(/(?:主角|人物|角色)[：:]\s*([^\n]+)/);
+            if (charLine?.[1]) {
+                const parts = charLine[1].split(/[、，,]/).map((s) => s.trim()).filter((s) => s && s.length <= 24);
+                for (const part of parts.slice(0, 4)) {
+                    const name = part.replace(/^(?:优势格斗者|弱势者|主角|角色)\s*/, "").split(/[\s（(]/)[0].trim();
+                    if (name && !seenNames.has(name)) {
+                        seenNames.add(name);
+                        characters.push({
+                            name,
+                            prompt: formatBilingualNodePrompt(
+                                `角色三视图与常用表情设定图（${name}）：纯白干净背景，左侧为正面、侧面、背面全身三视图，右侧为喜/怒/惊/痛等常用表情头像矩阵，同一张图内完整展示，五官发型服装材质前后严格一致，自然皮肤质感，无文字无水印。`,
+                                `Character turnaround sheet & common expressions (${name}) on clean pure white background: full-body three-view turnaround (front, side, back) alongside a grid of common facial expressions (neutral, angry, shocked, pain) in one unified sheet, consistent facial features, hair and outfit, photorealistic, no text, no watermark.`,
+                            ),
+                        });
+                    }
                 }
             }
         }
     }
 
     if (scenes.length === 0) {
-        const sceneLine = clean.match(/(?:场景|地点|环境)[：:]\s*([^\n]+)/);
-        const sceneDesc = sceneLine?.[1]?.trim() || segments[0]?.prompt.match(/【(?:本段概览|主体与空间层次)】([^\n【]+)/)?.[1]?.trim() || "核心主场景";
+        const sceneLine = clean.match(/(?:场景|地点|环境|开收场)[：:]\s*([^\n]+)/);
+        const rawOverview = segments[0]?.prompt.match(/【(?:本段概览|主体与空间层次)】([^\n【]+)/)?.[1]?.trim() || "";
+        const cleanedOverview = rawOverview.replace(/^(?:10秒|8秒|6秒|5秒|\d+秒)[，,、\s]*(?:9:16|16:9)?[，,、\s]*/g, "").trim();
+        const sceneDesc = sceneLine?.[1]?.trim() || cleanedOverview || "核心主场景";
         scenes.push({
             name: "核心主场景",
             prompt: formatBilingualNodePrompt(
-                `空镜场景设定图：16:9 横屏画幅，${sceneDesc}，超写实电影级光影与空间层次，无人物无文字无水印。`,
-                `Empty scene concept art, 16:9 widescreen, ${sceneDesc}, photorealistic cinematic lighting and spatial depth, no people, no text, no watermark.`,
+                `空镜场景设定图：${detectedRatio}画幅，${sceneDesc}，超写实电影级光影与空间层次，无人物无文字无水印。`,
+                `Empty scene concept art, ${detectedRatioEn}, ${sceneDesc}, photorealistic cinematic lighting and spatial depth, no people, no text, no watermark.`,
             ),
         });
     }
 
     if (props.length === 0) {
-        const propExtract = clean.match(/(?:道具|关键道具|核心道具)[：:]\s*([^\n]+)/);
-        if (propExtract?.[1]) {
-            const propName = propExtract[1].split(/[、，,。；;]/)[0].trim().slice(0, 16);
-            if (propName && !seenNames.has(propName)) {
-                seenNames.add(propName);
-                props.push({
-                    name: propName,
-                    prompt: formatBilingualNodePrompt(
-                        `关键道具三视图设定图（${propName}）：纯白干净背景，正面/侧面/俯视三视图同框，超写实材质纹理与几何结构，无人物无文字无水印。`,
-                        `Key prop three-view turnaround sheet (${propName}) on clean pure white background: front, side, and top views in one unified sheet, photorealistic material texture and structure, no people, no text, no watermark.`,
-                    ),
-                });
+        const lockPropMatch = clean.match(/统一道具锁定[：:]\s*\n?([\s\S]*?)(?=\n(?:统一|【|S\d+|$))/);
+        const propLines = lockPropMatch?.[1]
+            ? lockPropMatch[1]
+                  .split(/\n+/)
+                  .map((l) => l.trim())
+                  .filter(Boolean)
+            : [];
+        if (propLines.length > 0) {
+            for (const line of propLines.slice(0, 6)) {
+                const propName = line.split(/[，,：:（(]/)[0].trim().slice(0, 16);
+                if (propName && !seenNames.has(propName)) {
+                    seenNames.add(propName);
+                    props.push({
+                        name: propName,
+                        prompt: formatBilingualNodePrompt(
+                            `关键道具三视图设定图（${propName}）：纯白干净背景，正面/侧面/俯视三视图同框；道具细节锁定：${line}；超写实材质纹理与几何结构，无人物无文字无水印。`,
+                            `Key prop three-view turnaround sheet (${propName}) on clean pure white background: front, side, and top views in one unified sheet; locked details: ${line}; photorealistic material texture and structure, no people, no text, no watermark.`,
+                        ),
+                    });
+                }
+            }
+        } else {
+            const propExtract = clean.match(/(?:道具|关键道具|核心道具)[：:]\s*([^\n]+)/);
+            if (propExtract?.[1]) {
+                const propName = propExtract[1].split(/[、，,。；;]/)[0].trim().slice(0, 16);
+                if (propName && !seenNames.has(propName)) {
+                    seenNames.add(propName);
+                    props.push({
+                        name: propName,
+                        prompt: formatBilingualNodePrompt(
+                            `关键道具三视图设定图（${propName}）：纯白干净背景，正面/侧面/俯视三视图同框，超写实材质纹理与几何结构，无人物无文字无水印。`,
+                            `Key prop three-view turnaround sheet (${propName}) on clean pure white background: front, side, and top views in one unified sheet, photorealistic material texture and structure, no people, no text, no watermark.`,
+                        ),
+                    });
+                }
             }
         }
     }
