@@ -26,7 +26,20 @@
 
 > 适用场景：一台什么环境都没有的全新 Windows 电脑，只需确保装有 **Google Chrome** 或 **Microsoft Edge** 浏览器。
 
-1. 下载并解压本项目压缩包到任意目录（建议英文路径，如 `D:\Muse-Studio`）。
+### 方式一：终端一键拉取并启动（推荐，无需装 Git）
+按 `Win + R` 输入 `powershell` 回车，复制粘贴下面整行命令回车即可全自动下载、装环境并启动：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=Join-Path $env:USERPROFILE 'Muse-Studio'; $z=Join-Path $env:TEMP 'muse-studio.zip'; Invoke-WebRequest -Uri 'https://github.com/170KK/moonfield-muse-studio/archive/refs/heads/main.zip' -OutFile $z; Expand-Archive -Path $z -DestinationPath $env:TEMP -Force; if (Test-Path $d) { Remove-Item -Recurse -Force $d }; Move-Item (Join-Path $env:TEMP 'moonfield-muse-studio-main') $d; Remove-Item $z -Force; Set-Location $d; .\start_muse_studio.ps1"
+```
+
+如果本机已安装 `git`，也可以用：
+```powershell
+git clone https://github.com/170KK/moonfield-muse-studio.git; cd moonfield-muse-studio; powershell -NoProfile -ExecutionPolicy Bypass -File .\start_muse_studio.ps1
+```
+
+### 方式二：手动下载压缩包启动
+1. 点击页面右上角绿色 **`<> Code` → `Download ZIP`** 下载并解压到任意目录（建议英文路径，如 `D:\Muse-Studio`）。
 2. 双击根目录下的 **`启动 Muse Studio.bat`**。
    - **首次运行**会自动完成：检测并安装 Python 3.11 / Node.js LTS（若未安装会通过 `winget` 自动安装）→ 创建 `.venv` 并安装依赖 → 生成本机随机配置 `pool/.env` → 启动 **号池 (`18620`)**、**Agent (`17381`)** 与 **前端 (`3010`)** → 自动在浏览器打开 `http://127.0.0.1:3010`。
 3. 如需停止全部后台服务，双击 **`停止 Muse Studio.bat`** 即可。

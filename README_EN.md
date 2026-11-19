@@ -26,7 +26,20 @@
 
 > Works on a fresh Windows PC as long as **Google Chrome** or **Microsoft Edge** is installed.
 
-1. Download and extract the release archive to any folder (e.g. `D:\Muse-Studio`).
+### Option 1: One-Line Terminal Download & Launch (No Git Required)
+Open PowerShell (`Win + R` -> `powershell`) and paste this single command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=Join-Path $env:USERPROFILE 'Muse-Studio'; $z=Join-Path $env:TEMP 'muse-studio.zip'; Invoke-WebRequest -Uri 'https://github.com/170KK/moonfield-muse-studio/archive/refs/heads/main.zip' -OutFile $z; Expand-Archive -Path $z -DestinationPath $env:TEMP -Force; if (Test-Path $d) { Remove-Item -Recurse -Force $d }; Move-Item (Join-Path $env:TEMP 'moonfield-muse-studio-main') $d; Remove-Item $z -Force; Set-Location $d; .\start_muse_studio.ps1"
+```
+
+Or if `git` is already installed:
+```powershell
+git clone https://github.com/170KK/moonfield-muse-studio.git; cd moonfield-muse-studio; powershell -NoProfile -ExecutionPolicy Bypass -File .\start_muse_studio.ps1
+```
+
+### Option 2: Download ZIP & Double-Click
+1. Click **`<> Code` → `Download ZIP`** and extract to any folder (e.g. `D:\Muse-Studio`).
 2. Double-click **`启动 Muse Studio.bat`** in the root folder.
    - On **first launch**, it automatically installs Python 3.11 / Node.js LTS (via `winget` if missing), creates `.venv` and installs packages, generates `pool/.env` with a fresh random key, starts **Pool (`18620`)**, **Agent (`17381`)**, and **Web (`3010`)**, and opens `http://127.0.0.1:3010` in your browser.
 3. To stop all services, double-click **`停止 Muse Studio.bat`**.
