@@ -57,6 +57,7 @@ import { applyNodeConfigPatch, audioMetadata, buildAudioGenerationMetadata, buil
 import { autoArrangeCanvasNodes } from "@/lib/canvas/canvas-auto-layout";
 import { applyGroupSelection, applyUngroupSelection, canGroupSelectedNodes, canUngroupSelectedNodes, collectGroupMemberNodes, findContainingGroupId, findGroupDropTarget, focusViewportForNode, getConnectionTargetAnchor, getGroupWrapRect, normalizeConnection, snapNodesIntoGroup } from "@/lib/canvas/canvas-node-geometry";
 import {
+    applyPromptParameters,
     audioExtension,
     buildAngleLabel,
     buildAnglePrompt,
@@ -2715,6 +2716,7 @@ function InfiniteCanvasPage() {
             const effectivePrompt = rawNeg
                 ? `${basePrompt}\n\n[Negative / Avoid]: ${extractAiPromptForGeneration(rawNeg)}`
                 : basePrompt;
+            const resolvedGenConfig = applyPromptParameters(generationConfig, prompt, mode);
             if (runController.signal.aborted) {
                 finishGenerationRequest(nodeId, runController);
                 setRunningNodeId(null);
@@ -2878,7 +2880,7 @@ function InfiniteCanvasPage() {
                 }
 
                 if (mode === "video") {
-                    const spec = nodeSizeFromRatio(generationConfig.size, NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
+                    const spec = nodeSizeFromRatio(resolvedGenConfig.size, NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                     const isEmptyVideoNode = sourceNode?.type === CanvasNodeType.Video && !sourceNode.metadata?.content;
                     const reuseVideoNode = sourceNode?.type === CanvasNodeType.Video && (overwriteExisting || isEmptyVideoNode);
                     const videoId = reuseVideoNode ? nodeId : nanoid();
@@ -2893,13 +2895,14 @@ function InfiniteCanvasPage() {
                         metadata: {
                             prompt: effectivePrompt,
                             status: NODE_STATUS_LOADING,
-                            model: generationConfig.model,
-                            size: generationConfig.size,
-                            seconds: generationConfig.videoSeconds,
-                            vquality: generationConfig.vquality,
-                            generateAudio: generationConfig.videoGenerateAudio,
-                            watermark: generationConfig.videoWatermark,
-                            videoMode: generationConfig.videoMode,
+                            model: resolvedGenConfig.model,
+                            size: resolvedGenConfig.size,
+                            seconds: resolvedGenConfig.videoSeconds,
+                            vquality: resolvedGenConfig.vquality,
+                            fps: resolvedGenConfig.videoFps,
+                            generateAudio: resolvedGenConfig.videoGenerateAudio,
+                            watermark: resolvedGenConfig.videoWatermark,
+                            videoMode: resolvedGenConfig.videoMode,
                             references: generationReferenceUrls(generationContext),
                         },
                     };
@@ -2933,13 +2936,13 @@ function InfiniteCanvasPage() {
                                 videoRefImages = continuityMode === "tail-frame" ? [tailRef] : [tailRef, ...generationContext.referenceImages];
                             }
                         }
-                        await completeVideoNodeTask(videoId, generationConfig, effectivePrompt, videoRefImages, controller.signal, {
-                            size: generationConfig.size,
-                            seconds: generationConfig.videoSeconds,
-                            vquality: generationConfig.vquality,
-                            generateAudio: generationConfig.videoGenerateAudio,
-                            watermark: generationConfig.videoWatermark,
-                            videoMode: generationConfig.videoMode,
+                        await completeVideoNodeTask(videoId, resolvedGenConfig, effectivePrompt, videoRefImages, controller.signal, {
+                            size: resolvedGenConfig.size,
+                            seconds: resolvedGenConfig.videoSeconds,
+                            vquality: resolvedGenConfig.vquality,
+                            generateAudio: resolvedGenConfig.videoGenerateAudio,
+                            watermark: resolvedGenConfig.videoWatermark,
+                            videoMode: resolvedGenConfig.videoMode,
                             references: generationReferenceUrls(generationContext),
                         }, generationContext.referenceVideos, generationContext.referenceAudios);
                     } finally {
@@ -3137,7 +3140,7 @@ function InfiniteCanvasPage() {
         async (nodeId: string, _mode: CanvasNodeGenerationMode, prompt: string) => {
             const sourceNode = nodesRef.current.find((item) => item.id === nodeId);
             if (!sourceNode || sourceNode.type !== CanvasNodeType.Video) return;
-            const generationConfig = buildGenerationConfig(effectiveConfig, sourceNode, "video");
+            const generationConfig = applyPromptParameters(buildGenerationConfig(effectiveConfig, sourceNode, "video"), prompt, "video");
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                 openConfigDialog(true);
                 return;

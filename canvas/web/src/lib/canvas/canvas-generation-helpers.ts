@@ -126,6 +126,7 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         background: node?.metadata?.background ?? config.background ?? defaultConfig.background,
         videoSeconds: node?.metadata?.seconds || config.videoSeconds || defaultConfig.videoSeconds,
         vquality: node?.metadata?.vquality || config.vquality || defaultConfig.vquality,
+        videoFps: node?.metadata?.fps || config.videoFps || defaultConfig.videoFps,
         videoGenerateAudio: node?.metadata?.generateAudio || config.videoGenerateAudio || defaultConfig.videoGenerateAudio,
         videoWatermark: node?.metadata?.watermark || config.videoWatermark || defaultConfig.videoWatermark,
         videoMode: node?.metadata?.videoMode || config.videoMode || defaultConfig.videoMode,
@@ -135,6 +136,43 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         audioInstructions: node?.metadata?.audioInstructions || config.audioInstructions || defaultConfig.audioInstructions,
         count: String(node?.metadata?.count || (mode === "image" ? config.canvasImageCount || config.count : config.count) || defaultConfig.count),
     };
+}
+
+/** 从用户提示词中提取明确指定的参数（画幅比例、清晰度、秒数、帧率、音频），覆盖默认配置。 */
+export function applyPromptParameters(config: AiConfig, prompt: string, mode: CanvasNodeGenerationMode): AiConfig {
+    if (mode !== "video" || !prompt.trim()) return config;
+    const next = { ...config };
+
+    const ratioMatch = prompt.match(/\b(16:9|9:16|1:1|3:4|4:3|21:9)\b/);
+    if (ratioMatch) {
+        next.size = ratioMatch[1];
+    } else if (/竖屏/.test(prompt) && !/横屏/.test(prompt)) {
+        next.size = "9:16";
+    } else if (/横屏/.test(prompt) && !/竖屏/.test(prompt)) {
+        next.size = "16:9";
+    }
+
+    const qualityMatch = prompt.match(/\b(480|720|1080)p\b/i);
+    if (qualityMatch) {
+        next.vquality = `${qualityMatch[1]}p`;
+    }
+
+    const secMatch = prompt.match(/(\d{1,2})\s*(?:秒|s|sec|seconds)\b/i);
+    if (secMatch) {
+        const sec = Number(secMatch[1]);
+        if (sec >= 4 && sec <= 15) next.videoSeconds = String(sec);
+    }
+
+    const fpsMatch = prompt.match(/\b(30|48|60)\s*(?:fps|帧)\b/i);
+    if (fpsMatch) {
+        next.videoFps = fpsMatch[1];
+    }
+
+    if (/全程自带音频|自带音频/.test(prompt)) {
+        next.videoGenerateAudio = "on";
+    }
+
+    return next;
 }
 
 export function hasResumableVideoTask(node: CanvasNodeData) {
