@@ -3468,16 +3468,41 @@ function InfiniteCanvasPage() {
                 return;
             }
 
-            const context = hasSavedImageMetadata ? null : await hydrateNodeGenerationContext(buildNodeGenerationContext(sourceNode.id, nodesRef.current, connectionsRef.current, sourceNode.metadata?.prompt || node.metadata?.prompt || ""));
-            const prompt = (savedImageMetadata?.prompt || context?.prompt || "").trim();
+            const rawPrompt = (savedImageMetadata?.prompt || sourceNode.metadata?.prompt || node.metadata?.prompt || "").trim();
+            const rawNeg = (node.metadata?.negativePrompt || "").trim();
+            const basePromptForCtx = node.type === CanvasNodeType.Image ? extractAiPromptForGeneration(rawPrompt) : rawPrompt;
+            const effectiveBasePrompt =
+                node.type === CanvasNodeType.Image && rawNeg
+                    ? `${basePromptForCtx}\n\n[Negative / Avoid]: ${extractAiPromptForGeneration(rawNeg)}`
+                    : basePromptForCtx;
+
+            const isBatchImageRetry = node.type === CanvasNodeType.Image && Boolean(imageId);
+            const context =
+                hasSavedImageMetadata && !isBatchImageRetry
+                    ? null
+                    : await hydrateNodeGenerationContext(
+                          buildNodeGenerationContext(isBatchImageRetry ? node.id : sourceNode.id, nodesRef.current, connectionsRef.current, effectiveBasePrompt),
+                      );
+            const prompt = (isBatchImageRetry ? context?.prompt : savedImageMetadata?.prompt || context?.prompt || "").trim();
             if (!prompt) {
                 message.warning(t("canvas.projectPage.retryPromptMissing"));
                 return;
             }
-            const generationType = savedImageMetadata?.generationType;
-            const useReferenceImages = generationType ? generationType === "edit" : Boolean(context?.referenceImages.length);
+            const resolvedRetryConfig = applyPromptParameters(generationConfig, rawPrompt || prompt, node.type === CanvasNodeType.Video ? "video" : "image");
+            const generationType = isBatchImageRetry ? undefined : savedImageMetadata?.generationType;
+            const useReferenceImages = isBatchImageRetry
+                ? Boolean(context?.referenceImages.length)
+                : generationType
+                  ? generationType === "edit"
+                  : Boolean(context?.referenceImages.length);
             const retryReferenceImages =
-                hasSavedImageMetadata && savedImageMetadata ? await resolveMetadataReferences(savedImageMetadata) : useReferenceImages ? (context?.referenceImages.length ? context.referenceImages : sourceNodeReferenceImages(sourceNode)) : [];
+                !isBatchImageRetry && hasSavedImageMetadata && savedImageMetadata
+                    ? await resolveMetadataReferences(savedImageMetadata)
+                    : useReferenceImages
+                      ? context?.referenceImages.length
+                          ? context.referenceImages
+                          : sourceNodeReferenceImages(sourceNode)
+                      : [];
             if (useReferenceImages && !retryReferenceImages) {
                 message.error(t("canvas.projectPage.referenceMissing"));
                 setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: item.metadata?.content ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: item.metadata?.content ? undefined : t("canvas.projectPage.referenceMissing"), images: item.metadata?.images?.map((image) => (image.id === imageId ? { ...image, status: NODE_STATUS_ERROR, errorDetails: t("canvas.projectPage.referenceMissing") } : image)) } } : item)));
@@ -3523,8 +3548,8 @@ function InfiniteCanvasPage() {
                 }
 
                 const image = useReferenceImages
-                    ? await requestEdit(generationConfig, prompt, retryImages, { signal: controller.signal }).then((items) => items[0])
-                    : await requestGeneration(generationConfig, prompt, { signal: controller.signal }).then((items) => items[0]);
+                    ? await requestEdit(resolvedRetryConfig, prompt, retryImages, { signal: controller.signal }).then((items) => items[0])
+                    : await requestGeneration(resolvedRetryConfig, prompt, { signal: controller.signal }).then((items) => items[0]);
                 const uploadedImage = await uploadImage(image.dataUrl, { signal: controller.signal });
                 const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
                 const retryImage: CanvasNodeImage = {
@@ -3563,7 +3588,7 @@ function InfiniteCanvasPage() {
                                 ...(makePrimary ? imageMetadata(uploadedImage) : { status: NODE_STATUS_SUCCESS }),
                                 images: item.metadata?.images?.map((current) => (current.id === retryImage.id ? retryImage : current)),
                                 primaryImageId: makePrimary ? retryImage.id : item.metadata?.primaryImageId,
-                                prompt,
+                                prompt: isBatchImageRetry ? item.metadata?.prompt || rawPrompt : prompt,
                                 ...generationMetadata,
                             },
                         };
