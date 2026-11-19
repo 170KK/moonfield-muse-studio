@@ -3157,7 +3157,147 @@ function InfiniteCanvasPage() {
     const handleRegenerateVideoInPlace = useCallback(
         async (nodeId: string, _mode: CanvasNodeGenerationMode, prompt: string) => {
             const sourceNode = nodesRef.current.find((item) => item.id === nodeId);
-            if (!sourceNode || sourceNode.type !== CanvasNodeType.Video) return;
+            if (!sourceNode || (sourceNode.type !== CanvasNodeType.Video && sourceNode.type !== CanvasNodeType.Image)) return;
+
+            if (sourceNode.type === CanvasNodeType.Image) {
+                const generationConfig = buildGenerationConfig(effectiveConfig, sourceNode, "image");
+                if (!isAiConfigReady(generationConfig, generationConfig.model)) {
+                    openConfigDialog(true);
+                    return;
+                }
+                const rawNeg = (sourceNode.metadata?.negativePrompt || "").trim();
+                const basePrompt = extractAiPromptForGeneration(prompt.trim());
+                const effectivePrompt = rawNeg
+                    ? `${basePrompt}\n\n[Negative / Avoid]: ${extractAiPromptForGeneration(rawNeg)}`
+                    : basePrompt;
+                const count = getGenerationCount(generationConfig.count);
+                const existingImages: CanvasNodeImage[] = sourceNode.metadata?.images?.length
+                    ? sourceNode.metadata.images
+                    : sourceNode.metadata?.content
+                      ? [
+                            {
+                                id: sourceNode.metadata.primaryImageId || nanoid(),
+                                status: NODE_STATUS_SUCCESS,
+                                content: sourceNode.metadata.content,
+                                storageKey: sourceNode.metadata.storageKey,
+                                naturalWidth: sourceNode.metadata.naturalWidth || sourceNode.width,
+                                naturalHeight: sourceNode.metadata.naturalHeight || sourceNode.height,
+                                bytes: sourceNode.metadata.bytes || 0,
+                                mimeType: sourceNode.metadata.mimeType || "image/png",
+                            },
+                        ]
+                      : [];
+                const newImageIds = Array.from({ length: count }, () => nanoid());
+                const loadingSlots: CanvasNodeImage[] = newImageIds.map((id) => ({
+                    id,
+                    status: NODE_STATUS_LOADING,
+                    content: "",
+                    naturalWidth: 0,
+                    naturalHeight: 0,
+                    bytes: 0,
+                    mimeType: "",
+                }));
+                const nextImages = [...existingImages, ...loadingSlots];
+                const primaryImageId = sourceNode.metadata?.primaryImageId || existingImages[0]?.id;
+                setRunningNodeId(nodeId);
+                const controller = startGenerationRequest(nodeId, nodeId, nodeId);
+                setExpandedBatchNodeIds((current) => new Set(current).add(nodeId));
+                setNodes((prev) =>
+                    prev.map((item) =>
+                        item.id === nodeId
+                            ? { ...item, metadata: { ...item.metadata, prompt, images: nextImages, primaryImageId } }
+                            : item,
+                    ),
+                );
+                try {
+                    const generationContext = await hydrateNodeGenerationContext(buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, effectivePrompt));
+                    let firstSuccessId = "";
+                    let firstError = "";
+                    await Promise.all(
+                        newImageIds.map(async (imageId) => {
+                            try {
+                                const generated = await storeGeneratedImage(
+                                    await requestImageGeneration(generationConfig, generationContext.prompt, generationContext.referenceImages, {
+                                        signal: controller.signal,
+                                    }),
+                                );
+                                if (!firstSuccessId) firstSuccessId = imageId;
+                                setNodes((prev) =>
+                                    prev.map((item) => {
+                                        if (item.id !== nodeId) return item;
+                                        const images = (item.metadata?.images || []).map((img) =>
+                                            img.id === imageId
+                                                ? {
+                                                      ...img,
+                                                      status: NODE_STATUS_SUCCESS,
+                                                      content: generated.url,
+                                                      storageKey: generated.storageKey,
+                                                      naturalWidth: generated.naturalWidth,
+                                                      naturalHeight: generated.naturalHeight,
+                                                      bytes: generated.bytes,
+                                                      mimeType: generated.mimeType,
+                                                  }
+                                                : img,
+                                        );
+                                        const makePrimary = firstSuccessId === imageId;
+                                        return {
+                                            ...item,
+                                            metadata: {
+                                                ...item.metadata,
+                                                images,
+                                                ...(makePrimary
+                                                    ? {
+                                                          content: generated.url,
+                                                          storageKey: generated.storageKey,
+                                                          naturalWidth: generated.naturalWidth,
+                                                          naturalHeight: generated.naturalHeight,
+                                                          bytes: generated.bytes,
+                                                          mimeType: generated.mimeType,
+                                                          primaryImageId: imageId,
+                                                          status: NODE_STATUS_SUCCESS,
+                                                      }
+                                                    : {}),
+                                            },
+                                        };
+                                    }),
+                                );
+                            } catch (err) {
+                                if (isGenerationCanceled(err)) return;
+                                const errMsg = err instanceof Error ? err.message : t("canvas.projectPage.generationFailed");
+                                if (!firstError) firstError = errMsg;
+                                setNodes((prev) =>
+                                    prev.map((item) =>
+                                        item.id === nodeId
+                                            ? {
+                                                  ...item,
+                                                  metadata: {
+                                                      ...item.metadata,
+                                                      images: (item.metadata?.images || []).map((img) =>
+                                                          img.id === imageId ? { ...img, status: NODE_STATUS_ERROR, errorDetails: errMsg } : img,
+                                                      ),
+                                                  },
+                                              }
+                                            : item,
+                                    ),
+                                );
+                            }
+                        }),
+                    );
+                    if (!firstSuccessId && firstError && !controller.signal.aborted) {
+                        message.error(firstError);
+                    }
+                } catch (error) {
+                    if (!isGenerationCanceled(error)) {
+                        const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                        message.error(errorDetails);
+                    }
+                } finally {
+                    finishGenerationRequest(nodeId, controller);
+                    setRunningNodeId((current) => (current === nodeId ? null : current));
+                }
+                return;
+            }
+
             const generationConfig = applyPromptParameters(buildGenerationConfig(effectiveConfig, sourceNode, "video"), prompt, "video");
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                 openConfigDialog(true);

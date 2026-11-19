@@ -88,8 +88,8 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                 <div className="min-w-0 flex-1">
                     <CanvasNodeReferenceBar nodeId={node.id} nodes={nodes} connectedNodes={connectedNodes} onDisconnect={onDisconnectReference} onStartSelection={onStartReferenceSelection} onPickFromAssets={onPickReferenceFromAssets} />
                 </div>
-                {mode === "video" && hasVideoContent && onRegenerateInPlace ? (
-                    <Tooltip title="在当前视频卡上重新生成一版并叠加保留原视频（可设为主视频或创建副本）">
+                {((mode === "video" && hasVideoContent) || (mode === "image" && hasImageContent)) && onRegenerateInPlace ? (
+                    <Tooltip title={mode === "video" ? "在当前视频卡上重新生成一版并叠加保留原视频（可设为主视频或创建副本）" : "不带原图参考，仅按当前提示词与上游参考图重新生成一版并叠加保留原图"}>
                         <Button
                             size="small"
                             type="default"
