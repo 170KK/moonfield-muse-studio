@@ -1,0 +1,23 @@
+# Secrets & Local Config
+.env
+.env.local
+*.key
+*.pem
+
+# Runtime Data & User Profiles
+data/
+pool/data/
+*.log
+pids.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+
+# Release Output
+dist-release/
+*.zip

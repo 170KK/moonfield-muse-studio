@@ -1,0 +1,627 @@
+export type DirectorMode = "interview" | "direct" | "storyboard" | "reverse";
+
+export type DirectorLanguage = "bilingual" | "zh" | "en";
+
+export type DirectorDetailLevel = "detailed" | "concise";
+
+export type DirectorOptions = {
+    mode: DirectorMode;
+    durationSec: number; // 0 means auto / determined by script or interview
+    aspectRatio: "16:9" | "9:16";
+    language: DirectorLanguage;
+    detailLevel: DirectorDetailLevel;
+};
+
+export type ExtractedDirectorResult = {
+    zhPrompt: string;
+    enPrompt: string;
+    firstFramePrompt: string;
+    isFinalDeliverable: boolean;
+};
+
+export type InterviewQuestion = {
+    question: string;
+    options: string[];
+    preface: string;
+};
+
+export type DirectorSegmentItem = {
+    id: string;
+    title: string;
+    duration: number;
+    prompt: string;
+    enPrompt?: string;
+    negativePrompt?: string;
+    firstFramePrompt?: string;
+};
+
+export type DirectorAssetCard = {
+    name: string;
+    prompt: string;
+    enPrompt?: string;
+};
+
+export type DirectorStructuredWorkflow = {
+    negativePrompt?: string;
+    characters: DirectorAssetCard[];
+    scenes: DirectorAssetCard[];
+    props: DirectorAssetCard[];
+    segments: DirectorSegmentItem[];
+};
+
+/** 组合双语节点文本：中文注解在上（给人看），英文提示词在下（给 AI 生图/生视频用） */
+export function formatBilingualNodePrompt(zh?: string, en?: string): string {
+    const zhText = (zh || "").trim();
+    const enText = (en || "").trim();
+    if (zhText && enText) {
+        return `【中文注解】\n${zhText}\n\n【English Prompt】\n${enText}`;
+    }
+    return zhText || enText;
+}
+
+/** 从双语节点文本中提取实际发给 AI 生图/生视频的提示词（优先使用英文部分） */
+export function extractAiPromptForGeneration(raw: string): string {
+    const text = (raw || "").trim();
+    if (!text) return "";
+    const enMatch = text.match(/【(?:S\d+\s*)?English(?:\s+Video)?\s+Prompt】\s*([\s\S]+)$/i);
+    if (enMatch?.[1]?.trim()) {
+        return enMatch[1].trim();
+    }
+    return text;
+}
+
+const NON_OPTION_PREFIX =
+    /^(?:收到|已锁定|全片统一|结构[与和：:]|几何母题|转场链|风险排序|难点与顺序|开场与收场|系统预设|如果压到|现在有一个|第\s*\d+\s*问|【本段|【最高优先级|\[Highest Priority|\[Segment Overview|\[Output Format)/i;
+
+/** 清理因 muse2api / muse.ai DOM 重排造成的整段重复吐字（必须在未篡改的原始累积流上调用） */
+export function dedupeStreamText(raw: string): string {
+    let trimmed = raw.trimStart();
+    if (trimmed.length < 24) return raw;
+
+    // 1. Strip any tiny early stutter within the first 80 chars (e.g. first bullet reflow)
+    for (let probeLen of [10, 6, 4]) {
+        if (trimmed.length > probeLen * 2) {
+            const earlyProbe = trimmed.slice(0, probeLen);
+            const earlyIdx = trimmed.indexOf(earlyProbe, probeLen);
+            if (earlyIdx > 0 && earlyIdx < 80) {
+                trimmed = trimmed.slice(earlyIdx);
+                break;
+            }
+        }
+    }
+
+    // 2. Pick a 14-char prefix of the message and split all full-text redumps
+    const firstNewline = trimmed.indexOf("\n");
+    const prefixLen = Math.min(16, firstNewline >= 6 ? firstNewline : 16);
+    const prefix = trimmed.slice(0, prefixLen);
+    if (prefix.length < 6) return trimmed;
+
+    const indices: number[] = [];
+    let pos = 0;
+    while (pos < trimmed.length) {
+        const idx = trimmed.indexOf(prefix, pos);
+        if (idx < 0) break;
+        indices.push(idx);
+        pos = idx + prefix.length;
+    }
+
+    if (indices.length <= 1) return trimmed;
+
+    const dumps: string[] = [];
+    for (let i = 0; i < indices.length; i++) {
+        const start = indices[i];
+        const end = i + 1 < indices.length ? indices[i + 1] : trimmed.length;
+        dumps.push(trimmed.slice(start, end));
+    }
+
+    let best = dumps[0];
+    for (let i = 1; i < dumps.length; i++) {
+        if (dumps[i].length >= best.length - 12) {
+            best = dumps[i];
+        }
+    }
+    return best.trim();
+}
+
+export function parseInterviewQuestion(markdown: string): InterviewQuestion | null {
+    const text = dedupeStreamText(markdown).trim();
+    if (!text) return null;
+
+    // If it already contains final prompt blocks or JSON segments, it's a deliverable, NOT an interview question
+    if (
+        /【(?:S\d+\s*)?中文视频提示词】|【(?:S\d+\s*)?English\s+Video\s+Prompt】|\[Highest Priority\]|\[Segment Overview\]|"segments"\s*:/i.test(
+            text,
+        )
+    ) {
+        return null;
+    }
+
+    // 1. Explicit 【导演提问】 tag
+    const taggedMatch = text.match(/【导演提问】[：:\s]*([^\n]+)\n([\s\S]*)$/);
+    if (taggedMatch) {
+        const question = taggedMatch[1].trim();
+        const rawOpts = taggedMatch[2]
+            .split("\n")
+            .map((l) =>
+                l
+                    .replace(/^\s*(?:【选项[A-Fa-f0-9]*】|[-*•]|\d+[.)、]|[A-Fa-f][.)、：:])\s*/, "")
+                    .replace(/^\*\*|\*\*$/g, "")
+                    .trim(),
+            )
+            .filter((l) => l.length >= 2 && l.length <= 65 && !NON_OPTION_PREFIX.test(l) && !l.startsWith("```"));
+        const options = Array.from(new Set(rawOpts));
+        if (!options.some((o) => /导演决定/.test(o))) {
+            options.push("这一项由导演决定");
+        }
+        return {
+            question,
+            options: options.slice(0, 5),
+            preface: text.slice(0, taggedMatch.index).trim(),
+        };
+    }
+
+    // 2. Fallback: natural question format ("第 1 问：..." or line ending in ？) followed immediately by 2-5 short option lines
+    const lines = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+    let qIndex = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+        if (/^(?:第\s*\d+\s*问|问题\s*\d*|导演提问)[：:\s]/i.test(lines[i]) || (/[？?]$/.test(lines[i]) && lines[i].length <= 60)) {
+            qIndex = i;
+            break;
+        }
+    }
+    if (qIndex >= 0) {
+        const question = lines[qIndex].replace(/^\*\*|\*\*$/g, "").trim();
+        const candidateLines: string[] = [];
+        for (let j = qIndex + 1; j < lines.length; j++) {
+            const rawLine = lines[j];
+            // Stop immediately if we hit narrative paragraphs or repeated headers
+            if (NON_OPTION_PREFIX.test(rawLine) || rawLine.length > 68) {
+                break;
+            }
+            const cleaned = rawLine
+                .replace(/^\s*(?:【选项[A-Fa-f0-9]*】|[-*•]|\d+[.)、]|[①②③④⑤]|[A-Fa-f][.)、：:])\s*/, "")
+                .replace(/^\*\*|\*\*$/g, "")
+                .trim();
+            if (cleaned.length >= 2 && cleaned.length <= 65 && !NON_OPTION_PREFIX.test(cleaned)) {
+                candidateLines.push(cleaned);
+            }
+        }
+        const options = Array.from(new Set(candidateLines));
+        if (options.length >= 2) {
+            if (!options.some((o) => /导演决定/.test(o))) {
+                options.push("这一项由导演决定");
+            }
+            return {
+                question,
+                options: options.slice(0, 5),
+                preface: lines.slice(0, qIndex).join("\n"),
+            };
+        }
+    }
+
+    return null;
+}
+
+/** 修复 muse.ai innerText 导致 JSON 字符串内部出现裸换行符的问题 */
+function repairJsonStringNewlines(raw: string): string {
+    let out = "";
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < raw.length; i++) {
+        const ch = raw[i];
+        if (escaped) {
+            out += ch;
+            escaped = false;
+            continue;
+        }
+        if (ch === "\\") {
+            out += ch;
+            escaped = true;
+            continue;
+        }
+        if (ch === '"') {
+            inString = !inString;
+            out += ch;
+            continue;
+        }
+        if (inString && (ch === "\n" || ch === "\r")) {
+            if (ch === "\n") out += "\\n";
+            continue;
+        }
+        out += ch;
+    }
+    return out;
+}
+
+/** 当模型没有输出 JSON 或 JSON 被截断时，直接从正文提取中英文分镜与设定卡 */
+export function fallbackParseWorkflowFromText(text: string): DirectorStructuredWorkflow | null {
+    const clean = dedupeStreamText(text).trim();
+    if (!clean) return null;
+
+    const segments: DirectorSegmentItem[] = [];
+
+    // Try matching S01..S99+ or 分镜1..N (unlimited segments)
+    const zhMatches = Array.from(
+        clean.matchAll(
+            /(?:【(S\d+)\s*中文视频提示词】|(?:^|\n)\s*(?:#+\s*)?(S\d+|分镜[一二三四五六七八九十百\d]+)[^\n]*\n)([\s\S]*?)(?=(?:【S\d+\s*(?:中文视频提示词|English)|(?:^|\n)\s*(?:#+\s*)?(?:S\d+|分镜[一二三四五六七八九十百\d]+)\b|\[Highest Priority\]|【Highest Priority】|\[Segment Overview\]|【Segment Overview】|\{\s*"characters"|$))/gi,
+        ),
+    );
+    const enMatches = Array.from(
+        clean.matchAll(
+            /【(S\d+)?\s*English\s+Video\s+Prompt】([\s\S]*?)(?=(?:【(?:S\d+\s*)?(?:中文视频提示词|English\s+Video\s+Prompt)】|===WORKFLOW_JSON_START===|\{\s*"characters"|$))/gi,
+        ),
+    );
+
+    if (zhMatches.length > 0) {
+        zhMatches.forEach((m, idx) => {
+            const id = `S${String(idx + 1).padStart(2, "0")}`;
+            const body = (m[3] || m[0]).trim();
+            if (body.length > 20) {
+                segments.push({
+                    id,
+                    title: `第 ${idx + 1} 段分镜`,
+                    duration: 10,
+                    prompt: body,
+                });
+            }
+        });
+    }
+
+    if (enMatches.length > 0) {
+        enMatches.forEach((m, idx) => {
+            const enBody = (m[2] || "").trim();
+            if (segments[idx]) {
+                segments[idx].enPrompt = enBody;
+            } else if (enBody.length > 20) {
+                const id = `S${String(idx + 1).padStart(2, "0")}`;
+                segments.push({
+                    id,
+                    title: `Segment ${idx + 1}`,
+                    duration: 10,
+                    prompt: enBody,
+                    enPrompt: enBody,
+                });
+            }
+        });
+    }
+
+    // If still no segments but the text has substantial prompt content (>150 chars and not an interview question)
+    if (segments.length === 0 && clean.length > 150 && !parseInterviewQuestion(clean)) {
+        segments.push({
+            id: "S01",
+            title: "分镜片段 1",
+            duration: 10,
+            prompt: clean.slice(0, 1800),
+        });
+    }
+
+    if (segments.length === 0) return null;
+
+    // Extract explicit [图N] / 参考图分工 / 主体与道具 descriptions into distinct characters / scenes / props
+    const characters: Array<{ name: string; prompt: string }> = [];
+    const scenes: Array<{ name: string; prompt: string }> = [];
+    const props: Array<{ name: string; prompt: string }> = [];
+    const seenNames = new Set<string>();
+
+    // Only scan Chinese sections for [图N] so English "[图2] only for..." doesn't pollute Chinese cards
+    const zhOnlyText = segments.map((s) => s.prompt).join("\n\n") || clean;
+    const refMatches = Array.from(zhOnlyText.matchAll(/\[图\d+\]\s*([^；;。\n]+)/g));
+    for (const rm of refMatches) {
+        const desc = rm[1].trim();
+        // Skip English descriptions and cross-segment transition notes ("仅作...衔接参考", "不改变构图")
+        const hanziCount = (desc.match(/[\u4e00-\u9fa5]/g) || []).length;
+        const latinCount = (desc.match(/[a-zA-Z]/g) || []).length;
+        if (hanziCount < 4 || latinCount > hanziCount * 1.5) continue;
+        if (/^(?:仅作|只作|仅用于|用于与上一段|用于S\d+|不改变构图)/.test(desc)) continue;
+
+        const nameMatch = desc.match(/^([^，,：:]+?)(?:（[^）]*）)?(?:角色|三视图|场景|道具)?设定图?[，,：:\s]*(.*)$/);
+        const rawName = (nameMatch ? nameMatch[1] : desc.split(/[，,：:]/)[0]).replace(/(?:角色|三视图|场景|道具)?设定图?$/, "").trim();
+        if (!rawName || rawName.length > 24 || seenNames.has(rawName)) continue;
+        seenNames.add(rawName);
+        const descWithoutNoPeople = desc.replace(/无人物|没有人物|无人/g, "");
+        if (/场景|空镜|环境|景观/.test(desc) && !/角色设定|三视图/.test(desc)) {
+            scenes.push({
+                name: rawName,
+                prompt: `空镜场景设定图：16:9 横屏画幅，超写实电影级光影与空间层次，${desc}，无人物无文字无水印`,
+            });
+        } else if (/角色|三视图|全身/.test(desc) || /人物/.test(descWithoutNoPeople)) {
+            characters.push({
+                name: rawName,
+                prompt: `角色全身三视图设定图：正面、侧面、背面全身三视图同框，纯白干净背景，${desc}，五官、发型、服装材质与配色前后严格一致，超写实细节，无文字无水印`,
+            });
+        } else if (/道具|器物|黄叶|落叶|商品|物件|特写/.test(desc) && !/场景|全景|村落|山势/.test(desc)) {
+            props.push({
+                name: rawName,
+                prompt: `关键道具设定图：纯白或浅灰干净背景，微距特写质感，${desc}，材质纹理与几何结构清晰可辨，无人物无文字无水印`,
+            });
+        } else {
+            scenes.push({
+                name: rawName,
+                prompt: `空镜场景设定图：16:9 横屏画幅，超写实电影级光影与空间层次，${desc}，无人物无文字无水印`,
+            });
+        }
+    }
+
+    // Also extract distinct props/scenes from each segment's 【主体与空间层次】/【主体与道具】/【光色与材质】 if needed
+    segments.forEach((seg, idx) => {
+        const subjectMatch = seg.prompt.match(/【主体与(?:空间层次|道具)】([^\n【]+)/);
+        const lightMatch = seg.prompt.match(/【光色与材质】([^\n【]+)/);
+        const subjectText = subjectMatch ? subjectMatch[1].trim() : "";
+        const lightText = lightMatch ? lightMatch[1].trim() : "";
+
+        if (scenes.length <= idx && (subjectText || lightText)) {
+            const sceneName = `${seg.id} 场景`;
+            if (!seenNames.has(sceneName)) {
+                seenNames.add(sceneName);
+                scenes.push({
+                    name: sceneName,
+                    prompt: `【场景设定卡 · ${sceneName}】空镜场景设定图：16:9 横屏，${subjectText}；${lightText}；超写实电影质感，无人物无文字`,
+                });
+            }
+        }
+        const propExtract = seg.prompt.match(/核心道具(?:意象)?(?:即|为|是)?([^。；;\n]+)/);
+        if (propExtract?.[1]) {
+            const propDesc = propExtract[1].trim();
+            const propName = propDesc.split(/[与、，,]/)[0].trim().slice(0, 14) || `${seg.id} 关键道具`;
+            if (!seenNames.has(propName)) {
+                seenNames.add(propName);
+                props.push({
+                    name: propName,
+                    prompt: `【道具设定卡 · ${propName}】关键道具设定特写：${propDesc}，写实材质肌理与光影细节，无人物无文字`,
+                });
+            }
+        }
+    });
+
+    if (scenes.length === 0 && characters.length === 0 && props.length === 0) {
+        segments.forEach((seg) => {
+            scenes.push({
+                name: `${seg.id} 场景`,
+                prompt: `【场景设定卡 · ${seg.id}】空镜场景设定图，超写实电影级光影与材质细节：${seg.prompt.slice(0, 260)}`,
+            });
+        });
+    }
+
+    // Extract global or per-segment negative prompt
+    const globalNegativePrompt = extractNegativePromptFromText(clean) || extractNegativePromptFromText(zhOnlyText);
+
+    return {
+        negativePrompt: globalNegativePrompt,
+        characters,
+        scenes,
+        props,
+        segments: segments.map((s) => ({
+            ...s,
+            negativePrompt: s.negativePrompt || extractNegativePromptFromText(`${s.enPrompt || ""}\n${s.prompt}`) || globalNegativePrompt,
+        })),
+    };
+}
+
+function extractNegativePromptFromText(source: string): string | undefined {
+    const cleanSrc = source || "";
+    const m =
+        cleanSrc.match(/【(?:Negative(?:\s*\/\s*Anti-Drift)?(?:\s*Rules?)?|负面(?:提示词|与防跑偏|排除)?)】\s*([^\n【]+)/i) ||
+        cleanSrc.match(/(?:^|\n)\s*(?:负面提示词|负面排除|负面|Negative(?:\s*Prompt)?)[^：:\n]*[：:]\s*([^\n]+)/i);
+    const val = m?.[1]?.trim();
+    return val && val.length > 1 ? val : undefined;
+}
+
+export function parseDirectorWorkflowJson(text: string): DirectorStructuredWorkflow | null {
+    const candidates: string[] = [];
+    const tagMatch = text.match(/===WORKFLOW_JSON_START===([\s\S]*?)===WORKFLOW_JSON_END===/);
+    if (tagMatch?.[1]?.trim()) {
+        candidates.push(tagMatch[1].trim());
+    }
+    const fenceRe = /```(?:json|JSON)?\s*([\s\S]*?)```/g;
+    let m: RegExpExecArray | null;
+    while ((m = fenceRe.exec(text)) !== null) {
+        if (m[1]?.trim().startsWith("{")) candidates.push(m[1].trim());
+    }
+    // Look for the last JSON object containing "segments"
+    const segKeyIdx = text.lastIndexOf('"segments"');
+    if (segKeyIdx > 0) {
+        const openBrace = text.lastIndexOf("{", segKeyIdx);
+        // Find characters/scenes root brace before "segments"
+        const rootBrace = text.lastIndexOf('{"characters"', segKeyIdx);
+        const searchFrom = rootBrace >= 0 ? rootBrace : openBrace >= 0 ? text.lastIndexOf("{", Math.max(0, openBrace - 1)) : -1;
+        const startIdx = searchFrom >= 0 ? searchFrom : text.indexOf("{");
+        const endIdx = text.lastIndexOf("}");
+        if (startIdx >= 0 && endIdx > startIdx) {
+            candidates.push(text.slice(startIdx, endIdx + 1));
+        }
+    }
+    const firstBrace = text.indexOf("{");
+    const lastBrace = text.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+        candidates.push(text.slice(firstBrace, lastBrace + 1));
+    }
+
+    for (const raw of candidates) {
+        for (const attempt of [raw, repairJsonStringNewlines(raw)]) {
+            try {
+                const parsed = JSON.parse(attempt) as Partial<DirectorStructuredWorkflow>;
+                if (parsed && (Array.isArray(parsed.segments) || Array.isArray(parsed.characters) || Array.isArray(parsed.scenes))) {
+                    const fallbackNeg = extractNegativePromptFromText(text);
+                    const wf: DirectorStructuredWorkflow = {
+                        negativePrompt: parsed.negativePrompt ? String(parsed.negativePrompt) : fallbackNeg,
+                        characters: Array.isArray(parsed.characters)
+                            ? parsed.characters.filter((x) => x?.name && (x?.prompt || x?.enPrompt)).map((x) => ({
+                                  name: String(x.name),
+                                  prompt: String(x.prompt || x.enPrompt || ""),
+                                  enPrompt: x.enPrompt ? String(x.enPrompt) : undefined,
+                              }))
+                            : [],
+                        scenes: Array.isArray(parsed.scenes)
+                            ? parsed.scenes.filter((x) => x?.name && (x?.prompt || x?.enPrompt)).map((x) => ({
+                                  name: String(x.name),
+                                  prompt: String(x.prompt || x.enPrompt || ""),
+                                  enPrompt: x.enPrompt ? String(x.enPrompt) : undefined,
+                              }))
+                            : [],
+                        props: Array.isArray(parsed.props)
+                            ? parsed.props.filter((x) => x?.name && (x?.prompt || x?.enPrompt)).map((x) => ({
+                                  name: String(x.name),
+                                  prompt: String(x.prompt || x.enPrompt || ""),
+                                  enPrompt: x.enPrompt ? String(x.enPrompt) : undefined,
+                              }))
+                            : [],
+                        segments: Array.isArray(parsed.segments)
+                            ? parsed.segments
+                                  .filter((x) => x?.prompt || x?.enPrompt)
+                                  .map((x, idx) => ({
+                                      id: x.id || `S${String(idx + 1).padStart(2, "0")}`,
+                                      title: x.title || `第 ${idx + 1} 段`,
+                                      duration: Math.min(10, Math.max(5, Number(x.duration) || 10)),
+                                      prompt: String(x.prompt || x.enPrompt || ""),
+                                      enPrompt: x.enPrompt ? String(x.enPrompt) : undefined,
+                                      negativePrompt: x.negativePrompt ? String(x.negativePrompt) : fallbackNeg,
+                                      firstFramePrompt: x.firstFramePrompt ? String(x.firstFramePrompt) : undefined,
+                                  }))
+                            : [],
+                    };
+                    if (wf.segments.length > 0) {
+                        wf.negativePrompt = wf.negativePrompt || wf.segments.find((s) => s.negativePrompt)?.negativePrompt;
+                        return wf;
+                    }
+                }
+            } catch {
+                // try next candidate
+            }
+        }
+    }
+    return null;
+}
+
+export function buildWorkflowExtractPrompt(scriptText: string, aspectRatio: "16:9" | "9:16", durationSec: number): string {
+    const durHint = durationSec > 0 ? `总时长约 ${durationSec} 秒` : "按脚本实际段落拆分";
+    return `请将下面的导演脚本/分镜提示词，严格拆分为一个可直接用于无限画布节点生成的单行转义 JSON 对象。
+必须放在 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 之间，不要使用 markdown 代码块，JSON 字符串内部换行一律用 \\n 转义！
+
+===WORKFLOW_JSON_START===
+{"negativePrompt":"全局负面提示词（英文优先，如：no people, no text, no watermark, no distortion）","characters":[{"name":"角色名","prompt":"角色全身三视图中文注解（正面/侧面/背面、五官发型服装材质）","enPrompt":"Full-body three-view character turnaround sheet (front, side, back) on pure white background, detailed facial features, hair, outfit material and colors, consistent design, photorealistic, no text"}],"scenes":[{"name":"场景名","prompt":"空镜场景设定图中文注解（${aspectRatio}画幅，空间结构、光线色温、无人物）","enPrompt":"Empty scene concept art, ${aspectRatio} widescreen, spatial layout, lighting and color temperature, photorealistic cinematic texture, no people, no text"}],"props":[{"name":"道具名","prompt":"关键道具中文注解（纯白背景、材质纹理结构）","enPrompt":"Key prop design close-up on clean white background, detailed material texture and geometry, photorealistic, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"prompt":"S01完整中文视频提示词","enPrompt":"S01 complete English video prompt","negativePrompt":"S01 negative prompt"}]}
+===WORKFLOW_JSON_END===
+
+硬性规则：
+1. 仔细从脚本中提取所有出现或隐含的【角色】【场景】【关键道具（如门洞、落叶、商品、器物等）】；即使原脚本无人物，也必须拆出对应的 scenes（场景设定卡）和 props（关键意象/道具设定卡）！
+2. segments 必须按 Muse 单段 ≤10 秒上限拆分（${durHint}），每段必须同时提供完整的中文 prompt 与英文 enPrompt！
+
+待拆分的导演脚本如下：
+${scriptText}`;
+}
+
+export function buildDirectorSystemPrompt(opts: DirectorOptions): string {
+    const estSegments = opts.durationSec > 0 ? Math.max(1, Math.ceil(opts.durationSec / 10)) : 0;
+    const durationDesc =
+        opts.durationSec > 0
+            ? `用户在面板指定了目标总时长：${opts.durationSec} 秒（因 Muse 单次视频上限为 10 秒，必须按 ⌈${opts.durationSec}/10⌉ 拆分为至少 ${estSegments} 段独立生成的片段 S01..S${String(estSegments).padStart(2, "0")}，所有片段时长之和等于 ${opts.durationSec} 秒；若用户在正文中明确写了其他总时长或分段，以用户正文或访谈确认为准）`
+            : "目标总时长：自动（优先采用用户剧本/对话中确定的任意总时长 N 秒；若未指定，在访谈第 1 问询问总时长；确定总时长 N 秒后，因 Muse 单次上限 10 秒，自动按 ⌈N/10⌉ 拆分为对应数量的独立片段 S01、S02…SXX，不限段数）";
+
+    const langRule =
+        opts.language === "bilingual"
+            ? `【中英双语强制要求】：正式交付提示词时，每一段（S01、S02…）都**必须同时提供中文和英文两份完整提示词**，严格使用纯文本标题标记（**不要**使用 \`\`\` 代码块，以免网页渲染吞掉格式）：
+【S01 中文视频提示词】
+【本段最高优先级】...
+【本段概览】...
+【输出形式】...
+（完整中文导演提示词正文）
+
+【S01 English Video Prompt】
+【Highest Priority】 ...
+【Segment Overview】 ...
+【Output Format】 ...
+(Complete English director prompt matching the Chinese version, using 【...】 for section headers instead of square brackets [...])
+
+绝对禁止只输出中文漏掉英文！`
+            : opts.language === "zh"
+              ? "正式交付时，每一段使用纯文本标题【S01 中文视频提示词】输出完整中文提示词（不要使用 ``` 代码块）。"
+              : "When delivering final prompts, output standalone [S01 English Video Prompt] sections for each segment (do NOT use ``` code fences).";
+
+    const lengthRule =
+        opts.detailLevel === "detailed"
+            ? "采用【详细导演版】：每段中文提示词详细展开【本段最高优先级】【本段概览】【输出形式】、参考图分工、主体/服装/道具、空间层次、镜头运动时间线（0-3s / 3-7s / 7-10s 的方向/速度/起止状态）、光色材质、环境声/对白与防跑偏排除项；英文版完整对应。"
+            : "采用【精简可复制版】：每段保留【本段最高优先级】【本段概览】【输出形式】与核心镜头时间线、运镜、光影、声音及关键约束，每段中文约 300–450 字，英文完整对应。";
+
+    const jsonTailRule = `
+## 正式交付时的画布拆分 JSON（必须在交付最终提示词时附在最末尾）
+当你输出正式分镜/视频提示词（非提问阶段）时，在回复的最末尾**必须**用 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 包裹一个合法的 JSON 对象（**不要使用 \`\`\`json 代码块，且字符串内换行必须用 \\n 转义**）：
+===WORKFLOW_JSON_START===
+{"characters":[{"name":"角色名","prompt":"角色全身三视图提示词：正面、侧面、背面全身三视图，纯白背景，详细五官发型服装材质配色"}],"scenes":[{"name":"场景名","prompt":"空镜场景设定图提示词：${opts.aspectRatio}画幅，空间结构、光线色温、材质与氛围，无人物"}],"props":[{"name":"道具名","prompt":"关键道具/核心意象设定图提示词：纯白背景，材质、结构与细节特写"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"prompt":"S01完整中文视频提示词","enPrompt":"S01 complete English video prompt"}]}
+===WORKFLOW_JSON_END===`;
+
+    const modeRule = {
+        interview: `【当前模式：导演访谈（先一问一答，确认后再出完整双语分镜 + 拆分 JSON）】
+1. 先识别用户已给出的主体、分镜、时长、画幅和风格，绝不重复询问用户已经写清楚的内容。
+2. 若还有关键维度需确认（如总时长/分段方式、观看视角、开场与收场机位、配乐与环境声），**每轮只问 1 个问题**！
+3. **提问时的强制格式**（前端会识别【导演提问】与【选项A/B/C/D】并弹出交互式提问框，**严禁在【选项D】后面再输出任何其他文字**）：
+   先简短列出已锁定的要点（不超过 6 行），然后在最末尾严格按以下格式输出提问块：
+【导演提问】这里写本轮唯一的问题标题？
+【选项A】预设选项1（控制在 25 字以内）
+【选项B】预设选项2（控制在 25 字以内）
+【选项C】预设选项3（控制在 25 字以内）
+【选项D】这一项由导演决定
+4. 提问阶段**不要**输出成片提示词。
+5. 当用户回答完关键问题，或用户点击/输入“不要再提问 / 直接生成 / 剩下全部由导演决定”时，立即停止提问，直接输出：
+   - 每一段的【S0X 中文视频提示词】+【S0X English Video Prompt】（双语齐全！）
+   - 最末尾附上 ===WORKFLOW_JSON_START=== ... ===WORKFLOW_JSON_END=== 拆分数据。`,
+        direct: `【当前模式：直接出词（跳过访谈，立即交付双语提示词 + 拆分 JSON）】
+- 不提问，立即担任创意导演与摄影指导，补全机位、景别、运镜时间线、光影、材质与声景。
+- 若总时长超过 10 秒，自动按 ≤10 秒拆分为 S01、S02… 逐段交付中英双语提示词，并在末尾附上 ===WORKFLOW_JSON_START=== ... ===WORKFLOW_JSON_END=== 拆分数据。`,
+        storyboard: `【当前模式：分段分镜（Muse 单段 ≤10 秒强制拆段 + 双语 + 拆分 JSON）】
+- 不提问，直接将创意或脚本按 Muse 单段 ≤10 秒上限拆分为 S01、S02、S03…
+- 逐段输出独立的【S0X 中文视频提示词】与【S0X English Video Prompt】，并在最末尾附上 ===WORKFLOW_JSON_START=== ... ===WORKFLOW_JSON_END=== 拆分数据。`,
+        reverse: `【当前模式：视频反推 / 风格复刻】
+- 严格区分「实际观察」「合理推断」与「导演补全设计」。
+- 先列出镜头拆解，再输出可复刻该镜头语言的中英双语视频提示词及末尾 ===WORKFLOW_JSON_START=== ... ===WORKFLOW_JSON_END=== 拆分数据。`,
+    }[opts.mode];
+
+    return `你是 Muse Studio 无限画布内置的「视频提示词导演」（muse-video-prompt）。
+
+## 硬性参数与 Muse 能力边界
+- ${durationDesc}
+- Muse 单次视频生成上限为 10 秒（可选 5 / 6 / 8 / 10 秒）；超过 10 秒的作品必须拆分为多段（S01、S02、S03…）。
+- 目标画幅：${opts.aspectRatio}
+- 多张参考图在提示词中用 [图1]、[图2] 指代附件顺序。
+
+${modeRule}
+
+## 提示词结构与交付规范
+- ${langRule}
+- ${lengthRule}
+${jsonTailRule}`;
+}
+
+export function extractDirectorBlocks(markdown: string): ExtractedDirectorResult {
+    const clean = dedupeStreamText(markdown);
+    let zhPrompt = "";
+    let enPrompt = "";
+    let firstFramePrompt = "";
+
+    // 1. Check workflow JSON first (most structured and clean)
+    const wf = parseDirectorWorkflowJson(clean);
+    if (wf && wf.segments.length > 0) {
+        zhPrompt = wf.segments
+            .filter((s) => s.prompt)
+            .map((s) => `【${s.id} ${s.title}】\n${s.prompt}`)
+            .join("\n\n---\n\n");
+        enPrompt = wf.segments
+            .filter((s) => s.enPrompt)
+            .map((s) => `[${s.id} ${s.title}]\n${s.enPrompt}`)
+            .join("\n\n---\n\n");
+    }
+
+    // 2. Also extract explicit 【S0X 中文视频提示词】 and 【S0X English Video Prompt】 sections
+    const zhSectionRe = /【(?:S\d+\s*)?中文视频提示词】([\s\S]*?)(?=【(?:S\d+\s*)?(?:中文视频提示词|English\s+Video\s+Prompt)】|===WORKFLOW_JSON_START===|```json|$)/gi;
+    const enSectionRe = /【(?:S\d+\s*)?English\s+Video\s+Prompt】([\s\S]*?)(?=【(?:S\d+\s*)?(?:中文视频提示词|English\s+Video\s+Prompt)】|===WORKFLOW_JSON_START===|```json|$)/gi;
+
+    const zhSections = Array.from(clean.matchAll(zhSectionRe)).map((m) => m[0].trim());
+    const enSections = Array.from(clean.matchAll(enSectionRe)).map((m) => m[0].trim());
+
+    if (zhSections.length > 0) zhPrompt = zhSections.join("\n\n---\n\n");
+    if (enSections.length > 0) enPrompt = enSections.join("\n\n---\n\n");
+
+    const isFinalDeliverable = Boolean(zhPrompt || enPrompt);
+    return { zhPrompt, enPrompt, firstFramePrompt, isFinalDeliverable };
+}
