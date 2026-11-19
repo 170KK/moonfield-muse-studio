@@ -48,16 +48,21 @@ export async function requestVideoGeneration(config: AiConfig, prompt: string, r
 }
 
 export async function waitForVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationResult> {
-    const maxAttempts = 480; // 480 * 2.5s = 20 分钟，覆盖号池排队与 600s+ 长视频生成
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        const state = await pollVideoGenerationTask(config, task, options);
-        if (state.status === "completed") return state.result;
-        if (state.status === "failed") throw videoTaskFailed(state.error);
-        if (attempt === maxAttempts - 1) throw new Error(apiText("videoTimeout", { provider: "" }));
+    while (!options?.signal?.aborted) {
+        try {
+            const state = await pollVideoGenerationTask(config, task, options);
+            if (state.status === "completed") return state.result;
+            if (state.status === "failed") throw videoTaskFailed(state.error);
+        } catch (error) {
+            if (options?.signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+                throw error;
+            }
+            if (isVideoTaskFailed(error)) throw error;
+            // 仅在网络短暂抖动时等待后继续轮询，直到后端返回完成/失败或用户主动停止
+        }
         await delay(2500, options?.signal);
     }
-    throw new Error(apiText("videoTimeout", { provider: "" }));
+    throw new DOMException("Aborted", "AbortError");
 }
 
 export function isVideoTaskFailed(error: unknown) {

@@ -536,7 +536,7 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 <RefreshCw className="size-3.5" />
-                {t("canvas.node.retry")}
+                {node.type === CanvasNodeType.Video && node.metadata?.videoTaskId ? "找回视频" : t("canvas.node.retry")}
             </button>
         </div>
     );
