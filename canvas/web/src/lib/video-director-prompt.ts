@@ -424,26 +424,68 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
     }
 
     if (scenes.length === 0) {
+        const cleanSceneCandidate = (raw: string) =>
+            raw
+                .replace(/^(?:10秒|8秒|6秒|5秒|\d+秒)[，,、\s]*(?:9:16|16:9)?[，,、\s]*/g, "")
+                .replace(/[，,、\s]*(?:第三人称|第一人称|航拍|跟拍|推近|拉远|慢摇|环绕|骑行|步行|奔跑|打斗|配乐|轻民谣|音效|环境声|无对白|无多余人物|无文字水印)[^，,。；;]*/g, "")
+                .replace(/[^，,。；;]*(?:视角|身穿|身着|穿着|长裙|短裙|开衫|衬衫|外套|短裤|长裤|长发|短发|发型|面貌|服装|不变|锁定)[^，,。；;]*/g, "")
+                .replace(/^[，,、\s]+|[，,、\s]+$/g, "")
+                .trim();
+
+        const locRegex = /(?:古城|老街|街头|小巷|巷道|门洞|石板路|客栈|庭院|咖啡馆|室内|房间|湖畔|洱海|海边|海滩|码头|栈道|山顶|山道|森林|树林|竹林|草地|广场|公园|大桥|天台|走廊|教室|办公室|夜市|日落|清晨)[^，,。；;\n]{0,14}/g;
         const sceneLine = clean.match(/(?:场景|地点|环境)[：:]\s*([^\n]+)/);
-        const rawOverview = segments[0]?.prompt.match(/【(?:本段概览|主体与空间层次)】([^\n【]+)/)?.[1]?.trim() || "";
-        const bodyLead =
-            segments[0]?.prompt
-                .split("\n")
-                .find((l) => l.trim() && !/^【/.test(l.trim()))
-                ?.split(/[。；;]/)[0]
-                ?.trim() || "";
-        const rawCandidate = (sceneLine?.[1]?.trim() || bodyLead || rawOverview || "核心自然/建筑环境")
-            .replace(/^(?:10秒|8秒|6秒|5秒|\d+秒)[，,、\s]*(?:9:16|16:9)?[，,、\s]*/g, "")
-            .replace(/[，,、\s]*(?:第三人称|第一人称|航拍|跟拍|推近|拉远|慢摇|环绕|骑行|步行|奔跑|打斗|配乐|轻民谣|音效|环境声|无对白)[^，,。；;]*/g, "")
-            .trim();
-        const sceneDesc = rawCandidate || "核心实拍环境";
-        scenes.push({
-            name: "核心主场景",
-            prompt: formatBilingualNodePrompt(
-                `实拍空镜环境照片：${detectedRatio}画幅，${sceneDesc}；纯环境实拍，自然光线与真实空气透视，轻微胶片颗粒与自然景深，无人物无多余车辆道具，无文字无水印。`,
-                `Real-world live-action empty location photograph, ${detectedRatioEn}, natural real camera look, authentic daylight and atmospheric depth, subtle natural film grain, realistic textures, no people, no extra props, no CGI or concept art look, no text, no watermark.`,
-            ),
-        });
+        const extractedScenes: Array<{ name: string; desc: string }> = [];
+        const seenSceneKeys = new Set<string>();
+
+        if (sceneLine?.[1]) {
+            const parts = sceneLine[1].split(/[、；;\/]|与|和(?=(?:古城|湖|海|山|街|室|林|场|桥|园))/).map((p) => cleanSceneCandidate(p)).filter(Boolean);
+            for (const p of parts.slice(0, 4)) {
+                const key = p.slice(0, 4);
+                if (!seenSceneKeys.has(key)) {
+                    seenSceneKeys.add(key);
+                    extractedScenes.push({ name: p.slice(0, 12), desc: p });
+                }
+            }
+        }
+
+        for (const seg of segments) {
+            const segBody = seg.prompt.replace(/【[^】]+】[^\n]*/g, " ").trim();
+            const overview = seg.prompt.match(/【(?:本段概览|主体与空间层次)】([^\n【]+)/)?.[1]?.trim() || "";
+            const locMatches = Array.from(`${overview} ${segBody}`.matchAll(locRegex)).map((m) => cleanSceneCandidate(m[0])).filter((s) => s.length >= 2);
+            for (const loc of locMatches) {
+                const key = loc.slice(0, 2);
+                if (!seenSceneKeys.has(key) && extractedScenes.length < 4) {
+                    seenSceneKeys.add(key);
+                    const contextClause = cleanSceneCandidate(segBody.split(/[。；;\n]/).find((c) => c.includes(key)) || overview || loc);
+                    extractedScenes.push({
+                        name: loc.slice(0, 12),
+                        desc: contextClause && contextClause.length >= loc.length ? contextClause : loc,
+                    });
+                }
+            }
+        }
+
+        if (extractedScenes.length === 0) {
+            const rawOverview = segments[0]?.prompt.match(/【(?:本段概览|主体与空间层次)】([^\n【]+)/)?.[1]?.trim() || "";
+            const bodyLead =
+                segments[0]?.prompt
+                    .split("\n")
+                    .find((l) => l.trim() && !/^【/.test(l.trim()))
+                    ?.split(/[。；;]/)[0]
+                    ?.trim() || "";
+            const fallbackDesc = cleanSceneCandidate(bodyLead) || cleanSceneCandidate(rawOverview) || "核心实拍环境";
+            extractedScenes.push({ name: "核心主场景", desc: fallbackDesc });
+        }
+
+        for (const sc of extractedScenes) {
+            scenes.push({
+                name: sc.name,
+                prompt: formatBilingualNodePrompt(
+                    `实拍空镜环境照片（${sc.name}）：${detectedRatio}画幅，${sc.desc}；完整呈现前中远景空间结构、地面与建筑材质、自然光线方向与空气透视，轻微胶片颗粒与真实景深，纯环境无人物、无多余车辆道具、无文字水印。`,
+                    `Real-world live-action empty location photograph (${sc.name}), ${detectedRatioEn}, ${sc.desc}; detailed foreground-midground-background spatial depth, authentic surface textures and natural lighting direction, subtle film grain, no people, no extra props, no CGI look, no text, no watermark.`,
+                ),
+            });
+        }
     }
 
     if (props.length === 0) {
@@ -641,9 +683,11 @@ export function buildWorkflowExtractPrompt(scriptText: string, aspectRatio: "16:
 ===WORKFLOW_JSON_END===
 
 硬性规则：
-1. 【全局共享资产先拆】：从剧本中提取所有独立【角色】【核心物理场景】【关键道具】，全局共享复用——严禁把 S01..S06 分镜本身拆成 6 张假场景卡！
-2. 【人物卡只要单人正面实拍定妆照】：严禁写“三视图、表情矩阵、多视图”等易引发插画/CG感的词；每张人物卡只生成一张**真人实拍正面定妆照**，且**必须空手站立、不佩戴/不手持任何武器或道具**；【道具卡】：只生成单件实拍特写照片（也不用三视图）。
-3. 【精简少干扰原则】：人物、场景、道具、分镜参考图、分镜视频提示词全部保持**简洁直白、少干扰词**（只留基础设定与核心动作/机位/光线），依靠参考图连线保证人物与画风一致！
+1. 【全局共享资产先拆（多场景必须独立拆出）】：逐段扫描所有分镜（S01..SNN）和对话上下文中的物理地点转换——如果剧本包含多个不同地点（例如「古城巷道」与「洱海湖畔日落」、「室内」与「室外」等），**必须为每一个独立地点分别拆出单独的场景卡**（有2个地点就拆2张场景卡，有3个就拆3张），严禁合并成一个笼统的“核心主场景”；同时严禁把分镜数量直接当成假场景卡，同一地点被多段复用则只建 1 张场景卡。
+2. 【场景卡必须具体可控（禁止空泛、禁止混入人物）】：每张场景卡都必须是**可精准控场的实拍空镜环境描述**：写清**具体地点类型、建筑/地貌构图、前/中/远景核心元素、地面/墙面/水面材质细节、天气时段与主光方向色温（如清晨斜射暖光/傍晚金色逆光）、真实空气透视与胶片颗粒**；同时**严禁写入任何人物名字、人物穿搭、人物动作、运镜词或配乐词**！
+3. 【人物卡只要单人正面实拍定妆照】：严禁写“三视图、表情矩阵、多视图”等易引发插画/CG感的词；每张人物卡只生成一张**真人实拍正面定妆照**，且**必须空手站立、不佩戴/不手持任何武器或道具**；【道具卡】：只生成单件实拍特写照片（也不用三视图）。
+4. 【分镜精准关联资产】：每个分镜的 \`assetRefs\` 必须准确填写该段实际出镜的【角色名】与【对应场景名】（以及用到的【道具名】），确保第1段连场景A、第3段连场景B，不要乱连或漏连。
+5. 【精简少干扰原则】：分镜首帧参考图与视频提示词保持**简洁直白、少干扰词**（只留核心人物状态、景别运镜、动作与光线），依靠参考图连线保证人物与场景一致性！
 
 待拆分的导演脚本如下：
 ${scriptText}`;

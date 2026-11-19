@@ -84,6 +84,7 @@ export function VideoDirectorDrawer({
     const [messages, setMessages] = useState<ChatMsg[]>([]);
     const [streaming, setStreaming] = useState(false);
     const [extractingId, setExtractingId] = useState<string | null>(null);
+    const [deepExtractingId, setDeepExtractingId] = useState<string | null>(null);
     const [regeneratingCardKey, setRegeneratingCardKey] = useState<string | null>(null);
     const [workflowOverrides, setWorkflowOverrides] = useState<Record<string, DirectorStructuredWorkflow>>({});
     const abortRef = useRef<AbortController | null>(null);
@@ -353,7 +354,7 @@ export function VideoDirectorDrawer({
         const key = `${msgId}-${kind}-${index}`;
         setRegeneratingCardKey(key);
         try {
-            const kindLabel = kind === "characters" ? "角色全身三视图设定卡" : kind === "scenes" ? `空镜场景设定卡（${aspectRatio}画幅，无人物）` : "关键道具特写设定卡";
+            const kindLabel = kind === "characters" ? "角色真人实拍正面定妆照设定卡" : kind === "scenes" ? `实拍空镜场景设定卡（${aspectRatio}画幅，具体前中远景、材质与光线，严禁人物）` : "关键道具实拍特写设定卡";
             const newPrompt = await callTextCompletion(
                 "你是专业影视美术设定师，只输出一段可直接用于文生图的详细中文设定图提示词，不要输出多余寒暄或代码块。",
                 [
@@ -376,6 +377,35 @@ export function VideoDirectorDrawer({
             message.error(`重新生成失败：${err instanceof Error ? err.message : "未知错误"}`);
         } finally {
             setRegeneratingCardKey(null);
+        }
+    };
+
+    const handleDeepReExtractWorkflow = async (msgId: string, scriptText: string) => {
+        if (deepExtractingId || extractingId) return;
+        if (streaming) stopGenerating();
+        setDeepExtractingId(msgId);
+        try {
+            const fullContext = messages
+                .map((m) => `${m.role === "user" ? "【用户脚本/要求】" : "【导演方案】"}\n${dedupeStreamText(m.content)}`)
+                .join("\n\n");
+            const extractPrompt = buildWorkflowExtractPrompt(fullContext || scriptText, aspectRatio, durationSec);
+            const rawJson = await callTextCompletion(
+                "你是专业影视分镜与资产拆解专家，必须逐段核对所有独立角色、所有不同物理地点场景（多场景绝不合并）及道具，只输出 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 包裹的单行合法 JSON 对象。",
+                [{ role: "user", content: extractPrompt }],
+            );
+            const workflow = parseDirectorWorkflowJson(rawJson);
+            if (!workflow || !workflow.segments.length) {
+                message.error("重新深度拆解未返回有效结构，请再试一次");
+                return;
+            }
+            setWorkflowOverrides((prev) => ({ ...prev, [msgId]: workflow }));
+            message.success(
+                `已重新深度拆解：${workflow.characters.length} 角色卡 · ${workflow.scenes.length} 场景卡 · ${workflow.props.length} 道具卡 · ${workflow.segments.length} 段分镜`,
+            );
+        } catch (err) {
+            message.error(`重新深度拆解失败：${err instanceof Error ? err.message : "未知错误"}`);
+        } finally {
+            setDeepExtractingId(null);
         }
     };
 
@@ -710,7 +740,17 @@ export function VideoDirectorDrawer({
                                                     已拆分就绪：{parsedWf.characters.length} 角色卡 · {parsedWf.scenes.length} 场景卡 · {parsedWf.props.length} 道具卡 · {parsedWf.segments.length} 段分镜
                                                 </span>
                                             </div>
-                                            <Space size={4}>
+                                            <Space size={6} wrap>
+                                                <Tooltip title="由 AI 重新通读上下文与全部段落，细化并拆出全部独立角色、多场景与道具">
+                                                    <Button
+                                                        size="small"
+                                                        loading={deepExtractingId === msg.id}
+                                                        icon={<Sparkles className="size-3" />}
+                                                        onClick={() => void handleDeepReExtractWorkflow(msg.id, cleanText)}
+                                                    >
+                                                        重新深度拆解
+                                                    </Button>
+                                                </Tooltip>
                                                 <span className="text-[11px] text-stone-500">上画布语言:</span>
                                                 <Select
                                                     size="small"
@@ -730,7 +770,7 @@ export function VideoDirectorDrawer({
                                         {(["characters", "scenes", "props"] as const).map((kind) => {
                                             const list = parsedWf[kind];
                                             if (!list.length) return null;
-                                            const badgeLabel = kind === "characters" ? "角色设定卡(三视图)" : kind === "scenes" ? "场景设定卡" : "道具设定卡";
+                                            const badgeLabel = kind === "characters" ? "角色设定卡" : kind === "scenes" ? "场景设定卡" : "道具设定卡";
                                             const badgeColor = kind === "characters" ? "purple" : kind === "scenes" ? "cyan" : "orange";
                                             return (
                                                 <div key={kind} className="space-y-1">

@@ -3160,7 +3160,7 @@ function InfiniteCanvasPage() {
             if (!sourceNode || (sourceNode.type !== CanvasNodeType.Video && sourceNode.type !== CanvasNodeType.Image)) return;
 
             if (sourceNode.type === CanvasNodeType.Image) {
-                const generationConfig = buildGenerationConfig(effectiveConfig, sourceNode, "image");
+                const generationConfig = applyPromptParameters(buildGenerationConfig(effectiveConfig, sourceNode, "image"), prompt, "image");
                 if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                     openConfigDialog(true);
                     return;
@@ -3210,17 +3210,17 @@ function InfiniteCanvasPage() {
                     ),
                 );
                 try {
+                    // Build context strictly from upstream connected references + mentions (never include this node's own previous image)
                     const generationContext = await hydrateNodeGenerationContext(buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, effectivePrompt));
                     let firstSuccessId = "";
                     let firstError = "";
                     await Promise.all(
                         newImageIds.map(async (imageId) => {
                             try {
-                                const generated = await storeGeneratedImage(
-                                    await requestImageGeneration(generationConfig, generationContext.prompt, generationContext.referenceImages, {
-                                        signal: controller.signal,
-                                    }),
-                                );
+                                const image = generationContext.referenceImages.length
+                                    ? await requestEdit({ ...generationConfig, count: "1" }, generationContext.prompt, generationContext.referenceImages, { signal: controller.signal }).then((items) => items[0])
+                                    : await requestGeneration({ ...generationConfig, count: "1" }, generationContext.prompt, { signal: controller.signal }).then((items) => items[0]);
+                                const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
                                 if (!firstSuccessId) firstSuccessId = imageId;
                                 setNodes((prev) =>
                                     prev.map((item) => {
@@ -3230,12 +3230,12 @@ function InfiniteCanvasPage() {
                                                 ? {
                                                       ...img,
                                                       status: NODE_STATUS_SUCCESS,
-                                                      content: generated.url,
-                                                      storageKey: generated.storageKey,
-                                                      naturalWidth: generated.naturalWidth,
-                                                      naturalHeight: generated.naturalHeight,
-                                                      bytes: generated.bytes,
-                                                      mimeType: generated.mimeType,
+                                                      content: uploaded.url,
+                                                      storageKey: uploaded.storageKey,
+                                                      naturalWidth: uploaded.width,
+                                                      naturalHeight: uploaded.height,
+                                                      bytes: uploaded.bytes,
+                                                      mimeType: uploaded.mimeType,
                                                   }
                                                 : img,
                                         );
@@ -3247,12 +3247,12 @@ function InfiniteCanvasPage() {
                                                 images,
                                                 ...(makePrimary
                                                     ? {
-                                                          content: generated.url,
-                                                          storageKey: generated.storageKey,
-                                                          naturalWidth: generated.naturalWidth,
-                                                          naturalHeight: generated.naturalHeight,
-                                                          bytes: generated.bytes,
-                                                          mimeType: generated.mimeType,
+                                                          content: uploaded.url,
+                                                          storageKey: uploaded.storageKey,
+                                                          naturalWidth: uploaded.width,
+                                                          naturalHeight: uploaded.height,
+                                                          bytes: uploaded.bytes,
+                                                          mimeType: uploaded.mimeType,
                                                           primaryImageId: imageId,
                                                           status: NODE_STATUS_SUCCESS,
                                                       }

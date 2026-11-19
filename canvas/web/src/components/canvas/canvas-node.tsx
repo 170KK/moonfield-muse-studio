@@ -1023,28 +1023,34 @@ function ImageContent({
                 )}
             </div>
             {primaryImage?.status === "error" ? <BatchImageFailureActions placement="left" onRetry={() => onRetryBatchImage?.(primaryImage.id)} onDelete={() => onDeleteBatchImage?.(primaryImage.id)} /> : null}
-            {primaryImage?.content ? (
-                <button type="button" className="pointer-events-none absolute left-2.5 top-2.5 z-30 flex h-8 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium opacity-0 shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02] group-hover/node:pointer-events-auto group-hover/node:opacity-100" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownloadBatchImage?.(primaryImage.id))}>
-                    <Download className="size-3" />
-                    {t("common.download")}
-                </button>
-            ) : null}
-            {isBatchRoot ? (
-                <button
-                    type="button"
-                    className="absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(28,25,23,.16)] backdrop-blur-md transition hover:scale-[1.02]"
-                    style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
-                    aria-label={batchExpanded ? t("canvas.node.batchExpanded") : t("canvas.node.batchCollapsed")}
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleBatch?.();
-                    }}
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onPointerDown={(event) => event.stopPropagation()}
-                >
-                    <span className="leading-none">{t("canvas.controls.images", { count: batchCount })}</span>
-                    <ChevronRight className={`size-3.5 opacity-80 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
-                </button>
+            {primaryImage?.content || isBatchRoot ? (
+                <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex flex-wrap items-center justify-between gap-1">
+                    {primaryImage?.content ? (
+                        <button type="button" className="pointer-events-none flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium opacity-0 shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02] group-hover/node:pointer-events-auto group-hover/node:opacity-100" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownloadBatchImage?.(primaryImage.id))}>
+                            <Download className="size-3 shrink-0" />
+                            <span>{t("common.download")}</span>
+                        </button>
+                    ) : (
+                        <span />
+                    )}
+                    {isBatchRoot ? (
+                        <button
+                            type="button"
+                            className="pointer-events-auto ml-auto flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-[11px] font-semibold shadow-[0_6px_18px_rgba(28,25,23,.16)] backdrop-blur-md transition hover:scale-[1.02]"
+                            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
+                            aria-label={batchExpanded ? t("canvas.node.batchExpanded") : t("canvas.node.batchCollapsed")}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onToggleBatch?.();
+                            }}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onPointerDown={(event) => event.stopPropagation()}
+                        >
+                            <span className="leading-none">{t("canvas.controls.images", { count: batchCount })}</span>
+                            <ChevronRight className={`size-3.5 shrink-0 opacity-80 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
+                        </button>
+                    ) : null}
+                </div>
             ) : null}
         </BatchFrame>
     );
@@ -1102,18 +1108,18 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
         >
             {image.content ? <img src={source} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" /> : <ImageSlotStatus image={image} />}
             {image.content ? (
-                <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/node:pointer-events-auto group-hover/node:opacity-100">
-                    <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>
+                <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/node:pointer-events-auto group-hover/node:opacity-100">
+                    <button type="button" className="flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>
                         <Download className="size-3 shrink-0" />
-                        <span className="truncate">{t("common.download")}</span>
+                        <span>{t("common.download")}</span>
                     </button>
-                    <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.createCopy")} onClick={(event) => (event.stopPropagation(), onDuplicate())}>
+                    <button type="button" className="flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.createCopy")} onClick={(event) => (event.stopPropagation(), onDuplicate())}>
                         <Copy className="size-3 shrink-0" />
-                        <span className="truncate">{t("canvas.node.createCopy")}</span>
+                        <span>{t("canvas.node.createCopy")}</span>
                     </button>
-                    <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.setPrimary")} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
+                    <button type="button" className="flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.setPrimary")} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
                         <Star className="size-3 shrink-0" style={{ color: selectionBlue }} />
-                        <span className="truncate">{t("canvas.node.setPrimary")}</span>
+                        <span>{t("canvas.node.setPrimary")}</span>
                     </button>
                 </div>
             ) : null}
