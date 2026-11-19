@@ -424,15 +424,24 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
     }
 
     if (scenes.length === 0) {
-        const sceneLine = clean.match(/(?:场景|地点|环境|开收场)[：:]\s*([^\n]+)/);
+        const sceneLine = clean.match(/(?:场景|地点|环境)[：:]\s*([^\n]+)/);
         const rawOverview = segments[0]?.prompt.match(/【(?:本段概览|主体与空间层次)】([^\n【]+)/)?.[1]?.trim() || "";
-        const cleanedOverview = rawOverview.replace(/^(?:10秒|8秒|6秒|5秒|\d+秒)[，,、\s]*(?:9:16|16:9)?[，,、\s]*/g, "").trim();
-        const sceneDesc = sceneLine?.[1]?.trim() || cleanedOverview || "核心主场景";
+        const bodyLead =
+            segments[0]?.prompt
+                .split("\n")
+                .find((l) => l.trim() && !/^【/.test(l.trim()))
+                ?.split(/[。；;]/)[0]
+                ?.trim() || "";
+        const rawCandidate = (sceneLine?.[1]?.trim() || bodyLead || rawOverview || "核心自然/建筑环境")
+            .replace(/^(?:10秒|8秒|6秒|5秒|\d+秒)[，,、\s]*(?:9:16|16:9)?[，,、\s]*/g, "")
+            .replace(/[，,、\s]*(?:第三人称|第一人称|航拍|跟拍|推近|拉远|慢摇|环绕|骑行|步行|奔跑|打斗|配乐|轻民谣|音效|环境声|无对白)[^，,。；;]*/g, "")
+            .trim();
+        const sceneDesc = rawCandidate || "核心实拍环境";
         scenes.push({
             name: "核心主场景",
             prompt: formatBilingualNodePrompt(
-                `空镜场景设定图：${detectedRatio}画幅，${sceneDesc}，超写实电影级光影与空间层次，无人物无文字无水印。`,
-                `Empty scene concept art, ${detectedRatioEn}, ${sceneDesc}, photorealistic cinematic lighting and spatial depth, no people, no text, no watermark.`,
+                `实拍空镜环境照片：${detectedRatio}画幅，${sceneDesc}；纯环境实拍，自然光线与真实空气透视，轻微胶片颗粒与自然景深，无人物无多余车辆道具，无文字无水印。`,
+                `Real-world live-action empty location photograph, ${detectedRatioEn}, natural real camera look, authentic daylight and atmospheric depth, subtle natural film grain, realistic textures, no people, no extra props, no CGI or concept art look, no text, no watermark.`,
             ),
         });
     }
@@ -628,7 +637,7 @@ export function buildWorkflowExtractPrompt(scriptText: string, aspectRatio: "16:
 必须放在 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 之间，不要使用 markdown 代码块，JSON 字符串内部换行一律用 \\n 转义！
 
 ===WORKFLOW_JSON_START===
-{"negativePrompt":"no text, no watermark, no logo, no over-sharpened plastic skin","characters":[{"name":"角色名","prompt":"真人实拍正面定妆照中文描述（年龄外貌、核心服装、空手站立无武器道具、浅灰背景、自然光、真实皮肤纹理、85mm镜头）","enPrompt":"Live-action front-facing casting photograph of [name], core age/appearance/outfit, empty-handed with no weapons or props, clean studio background, soft natural light, natural skin texture, 85mm lens, no text"}],"scenes":[{"name":"核心场景名","prompt":"真人实拍空镜照片（${aspectRatio}画幅，核心环境与自然光线，无人物）","enPrompt":"Live-action empty scene photograph, ${aspectRatio}, core environment and natural lighting, no people, no text"}],"props":[{"name":"道具名","prompt":"实拍道具特写照片（核心材质与外观，干净背景，自然光，无人物）","enPrompt":"Live-action close-up photograph of prop, realistic material texture, clean background, natural light, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01精简首帧实拍参考图提示词（参考已连入人物/场景/道具，写清景别、站位与光线，减少冗余词）","firstFrameEnPrompt":"S01 concise live-action keyframe photograph matching connected references, framing, pose and natural lighting, no text","prompt":"S01精简写实中文视频提示词（只写核心人物状态、景别运镜、关键动作、光线与无文字水印，不堆砌冗余词）","enPrompt":"S01 concise live-action video prompt focusing on subject, framing, camera move, action and natural lighting, no text","negativePrompt":"S01 negative prompt"}]}
+{"negativePrompt":"no text, no watermark, no logo, no over-sharpened plastic skin","characters":[{"name":"角色名","prompt":"真人实拍正面定妆照中文描述（年龄外貌、核心服装、空手站立无武器道具、浅灰背景、自然光、真实皮肤纹理、85mm镜头）","enPrompt":"Live-action front-facing casting photograph of [name], core age/appearance/outfit, empty-handed with no weapons or props, clean studio background, soft natural light, natural skin texture, 85mm lens, no text"}],"scenes":[{"name":"核心场景名","prompt":"实拍空镜环境照片（${aspectRatio}画幅，只写地点、地形材质、天气时段与自然光线，严禁写入人物动作、运镜、配乐或多余道具，强调真实摄影质感与自然颗粒，无人物）","enPrompt":"Real-world live-action empty location photograph, ${aspectRatio}, pure environment/terrain/weather/lighting only (NO character actions, NO camera moves, NO music, NO extra props), authentic daylight, natural depth of field and subtle film grain, no people, no CGI or concept art look, no text"}],"props":[{"name":"道具名","prompt":"实拍道具特写照片（核心材质与外观，干净背景，自然光，无人物）","enPrompt":"Live-action close-up photograph of prop, realistic material texture, clean background, natural light, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01精简首帧实拍参考图提示词（参考已连入人物/场景/道具，写清景别、站位与光线，减少冗余词）","firstFrameEnPrompt":"S01 concise live-action keyframe photograph matching connected references, framing, pose and natural lighting, no text","prompt":"S01精简写实中文视频提示词（只写核心人物状态、景别运镜、关键动作、光线与无文字水印，不堆砌冗余词）","enPrompt":"S01 concise live-action video prompt focusing on subject, framing, camera move, action and natural lighting, no text","negativePrompt":"S01 negative prompt"}]}
 ===WORKFLOW_JSON_END===
 
 硬性规则：
@@ -681,7 +690,7 @@ export function buildDirectorSystemPrompt(opts: DirectorOptions): string {
 ## 正式交付时的画布拆分 JSON（必须在交付最终提示词时附在最末尾）
 当你输出正式分镜/视频提示词（非提问阶段）时，在回复的最末尾**必须**用 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 包裹一个合法的 JSON 对象（**不要使用 \`\`\`json 代码块，且字符串内换行必须用 \\n 转义**）：
 ===WORKFLOW_JSON_START===
-{"negativePrompt":"no text, no watermark, no logo","characters":[{"name":"角色名","prompt":"真人实拍正面定妆照（空手站立无武器道具、干净浅灰背景、自然光、真实皮肤纹理、85mm镜头）","enPrompt":"Live-action front-facing casting photograph, empty-handed no weapons or props, clean studio background, soft natural light, natural skin texture, 85mm lens, no text"}],"scenes":[{"name":"核心场景名","prompt":"真人实拍空镜照片（${opts.aspectRatio}画幅，核心环境与自然光线，无人物）","enPrompt":"Live-action empty scene photograph, ${opts.aspectRatio}, core environment and natural lighting, no people, no text"}],"props":[{"name":"道具名","prompt":"实拍道具特写照片（干净浅色背景，自然光，真实材质，无人物）","enPrompt":"Live-action close-up photograph of prop, clean light background, natural light, realistic texture, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01精简首帧实拍参考图（景别、人物站位、光线）","firstFrameEnPrompt":"S01 concise live-action keyframe photograph, framing, pose, natural lighting, no text","prompt":"S01精简中文视频提示词","enPrompt":"S01 concise English video prompt"}]}
+{"negativePrompt":"no text, no watermark, no logo","characters":[{"name":"角色名","prompt":"真人实拍正面定妆照（空手站立无武器道具、干净浅灰背景、自然光、真实皮肤纹理、85mm镜头）","enPrompt":"Live-action front-facing casting photograph, empty-handed no weapons or props, clean studio background, soft natural light, natural skin texture, 85mm lens, no text"}],"scenes":[{"name":"核心场景名","prompt":"实拍空镜环境照片（${opts.aspectRatio}画幅，只写地点材质、时段天气与自然光线，不写动作运镜配乐，真实摄影颗粒感，无人物）","enPrompt":"Real-world live-action empty location photograph, ${opts.aspectRatio}, pure environment/lighting/weather only, authentic photography with subtle film grain and natural depth of field, no people, no concept art look, no text"}],"props":[{"name":"道具名","prompt":"实拍道具特写照片（干净浅色背景，自然光，真实材质，无人物）","enPrompt":"Live-action close-up photograph of prop, clean light background, natural light, realistic texture, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01精简首帧实拍参考图（景别、人物站位、光线）","firstFrameEnPrompt":"S01 concise live-action keyframe photograph, framing, pose, natural lighting, no text","prompt":"S01精简中文视频提示词","enPrompt":"S01 concise English video prompt"}]}
 ===WORKFLOW_JSON_END===`;
 
     const modeRule = {
