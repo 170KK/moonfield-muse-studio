@@ -80,6 +80,7 @@ export function VideoDirectorDrawer({
     const [nodePromptLang, setNodePromptLang] = useState<"bilingual" | "zh" | "en">("bilingual");
     const [imageCount, setImageCount] = useState<number>(() => Math.max(1, Number(config.canvasImageCount) || 1));
     const [input, setInput] = useState("");
+    const [inlineReplyByMsgId, setInlineReplyByMsgId] = useState<Record<string, string>>({});
     const [messages, setMessages] = useState<ChatMsg[]>([]);
     const [streaming, setStreaming] = useState(false);
     const [extractingId, setExtractingId] = useState<string | null>(null);
@@ -639,7 +640,36 @@ export function VideoDirectorDrawer({
                                             ))}
                                         </div>
                                         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-amber-200/80 pt-2 dark:border-amber-800/60">
-                                            <span className="text-[11px] text-stone-500">也可在下方输入框自由输入回答</span>
+                                            <div className="flex min-w-[180px] flex-1 items-center gap-1.5">
+                                                <Input
+                                                    size="small"
+                                                    placeholder="可直接在此自由输入回答（回车发送）"
+                                                    value={inlineReplyByMsgId[msg.id] || ""}
+                                                    disabled={streaming}
+                                                    onChange={(e) => setInlineReplyByMsgId((prev) => ({ ...prev, [msg.id]: e.target.value }))}
+                                                    onPressEnter={() => {
+                                                        const val = (inlineReplyByMsgId[msg.id] || "").trim();
+                                                        if (!val || streaming) return;
+                                                        setInlineReplyByMsgId((prev) => ({ ...prev, [msg.id]: "" }));
+                                                        void sendMessage(val);
+                                                    }}
+                                                    className="!text-xs"
+                                                />
+                                                {(inlineReplyByMsgId[msg.id] || "").trim() ? (
+                                                    <Button
+                                                        size="small"
+                                                        disabled={streaming}
+                                                        onClick={() => {
+                                                            const val = (inlineReplyByMsgId[msg.id] || "").trim();
+                                                            if (!val || streaming) return;
+                                                            setInlineReplyByMsgId((prev) => ({ ...prev, [msg.id]: "" }));
+                                                            void sendMessage(val);
+                                                        }}
+                                                    >
+                                                        发送
+                                                    </Button>
+                                                ) : null}
+                                            </div>
                                             <Button
                                                 size="small"
                                                 type="primary"
