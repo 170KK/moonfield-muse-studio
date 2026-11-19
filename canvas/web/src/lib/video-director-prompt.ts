@@ -575,14 +575,21 @@ export function buildDirectorSystemPrompt(opts: DirectorOptions): string {
 
     const lengthRule =
         opts.detailLevel === "detailed"
-            ? "采用【详细导演版】：每段中文提示词详细展开【本段最高优先级】【本段概览】【输出形式】、参考图分工、主体/服装/道具、空间层次、镜头运动时间线（0-3s / 3-7s / 7-10s 的方向/速度/起止状态）、光色材质、环境声/对白与防跑偏排除项；英文版完整对应。"
-            : "采用【精简可复制版】：每段保留【本段最高优先级】【本段概览】【输出形式】与核心镜头时间线、运镜、光影、声音及关键约束，每段中文约 300–450 字，英文完整对应。";
+            ? `采用【详细导演版 + 去 AI 感写实规范】：每段提示词严禁只写空洞形容词，必须写实落细 7 个要素：
+  1) 【人物】：具体年龄/体型/发型/自然妆容/微表情，写明「五官可辨但不处处锐利、自然皮肤质感与透亮肤色」；
+  2) 【服装】：具体单品+颜色+面料材质+版型+物理垂坠/随风微扬，写明「服装全程不变」；
+  3) 【场景】：室内外具体空间+前景/中景/背景真实材质物件+背景轻微虚化，「场景固定」；
+  4) 【光线】：主光方向+软硬（如暖色柔光正面打/柔和漫射光）+皮肤与面料自然反光+暗部微弱颗粒；
+  5) 【机位光学】：明确 ${opts.aspectRatio} 画幅+具体景别（全身/中近景腰腹以上/大腿以上）+眼平或手持视角+焦段（如 85mm 长焦/轻微移轴/浅景深）+运镜轨迹；
+  6) 【动作时间线】：0-3s / 3-7s / 7-10s 起止姿态、呼吸起伏、重心移动与物理惯性；
+  7) 【真实质感与避坑】：主动保留「轻微动态拖影、短暂失焦、自然颗粒与少量彩噪、轻微晃动或平稳跟随」，严禁使用「强稳定、全程处处锐利、完美无瑕」等加重 AI 塑料感的词，并明确「无文字水印、无任何文字、无 logo」。英文版完整对应。`
+            : `采用【精简写实版（去 AI 感）】：每段保留【本段最高优先级】【本段概览】【输出形式】与核心 7 要素（人物肤质、服装面料版型不变、场景元素与虚化、主光软硬与反光、景别焦段运镜、动作起止与呼吸感、轻微拖影/自然颗粒/无文字水印），每段中文约 320–480 字，英文完整对应。`;
 
     const jsonTailRule = `
 ## 正式交付时的画布拆分 JSON（必须在交付最终提示词时附在最末尾）
 当你输出正式分镜/视频提示词（非提问阶段）时，在回复的最末尾**必须**用 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 包裹一个合法的 JSON 对象（**不要使用 \`\`\`json 代码块，且字符串内换行必须用 \\n 转义**）：
 ===WORKFLOW_JSON_START===
-{"characters":[{"name":"角色名","prompt":"角色全身三视图提示词：正面、侧面、背面全身三视图，纯白背景，详细五官发型服装材质配色"}],"scenes":[{"name":"场景名","prompt":"空镜场景设定图提示词：${opts.aspectRatio}画幅，空间结构、光线色温、材质与氛围，无人物"}],"props":[{"name":"道具名","prompt":"关键道具/核心意象设定图提示词：纯白背景，材质、结构与细节特写"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"prompt":"S01完整中文视频提示词","enPrompt":"S01 complete English video prompt"}]}
+{"negativePrompt":"no text, no watermark, no logo, no over-sharpened plastic skin, no distortion","characters":[{"name":"角色名","prompt":"角色全身三视图+常用表情矩阵中文注解（纯白背景，正面/侧面/背面全身三视图与常用表情头像画在同一张图内，写清五官发型肤质服装面料）","enPrompt":"Character turnaround sheet & common facial expressions grid on pure white background (front, side, back full-body views + expression portraits in one unified sheet), natural skin texture, detailed outfit fabric, photorealistic, no text, no watermark"}],"scenes":[{"name":"核心场景名","prompt":"空镜场景设定图中文注解（${opts.aspectRatio}画幅，空间结构、光线方向软硬、材质与背景虚化，无人物无文字）","enPrompt":"Empty scene concept art, ${opts.aspectRatio} widescreen, spatial layout, lighting direction and softness, material texture, no people, no text, no watermark"}],"props":[{"name":"道具名","prompt":"关键道具三视图中文注解（纯白背景，正面/侧面/俯视三视图画在同一张图内，写清材质纹理结构）","enPrompt":"Key prop three-view turnaround sheet (front, side, top) on pure white background, detailed material texture, photorealistic, no people, no text, no watermark"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01分镜首帧参考图中文注解（结合人物服装、场景光影、景别焦段与站位）","firstFrameEnPrompt":"S01 keyframe reference image prompt combining character outfit, scene lighting, framing, lens and pose, natural skin texture, no text","prompt":"S01完整中文视频动态提示词","enPrompt":"S01 complete English video prompt"}]}
 ===WORKFLOW_JSON_END===`;
 
     const modeRule = {
