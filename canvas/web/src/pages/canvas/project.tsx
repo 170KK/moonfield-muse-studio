@@ -2737,7 +2737,18 @@ function InfiniteCanvasPage() {
                     const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
                     const isImageNode = sourceNode?.type === CanvasNodeType.Image;
                     const isEmptyImageNode = isImageNode && !sourceNode?.metadata?.content;
+                    const downstreamEmptyImage =
+                        sourceNode?.type === CanvasNodeType.Text
+                            ? nodesRef.current.find(
+                                  (n) =>
+                                      n.type === CanvasNodeType.Image &&
+                                      !n.metadata?.content &&
+                                      n.metadata?.status !== NODE_STATUS_LOADING &&
+                                      connectionsRef.current.some((c) => c.fromNodeId === nodeId && c.toNodeId === n.id),
+                              )
+                            : undefined;
                     const reuseImageNode = isImageNode && (overwriteExisting || isEmptyImageNode);
+                    const reuseDownstreamImage = Boolean(downstreamEmptyImage);
                     const sourceReference =
                         isImageNode && sourceNode?.metadata?.content && !overwriteExisting
                             ? [{ id: sourceNode.id, name: `${sourceNode.title || sourceNode.id}.png`, type: sourceNode.metadata.mimeType || "image/png", dataUrl: sourceNode.metadata.content, storageKey: sourceNode.metadata.storageKey }]
@@ -2748,19 +2759,21 @@ function InfiniteCanvasPage() {
                     const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];
                     const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
                     const parentPosition = sourceNode?.position || { x: 0, y: 0 };
-                    const rootId = reuseImageNode ? nodeId : nanoid();
+                    const rootId = reuseImageNode ? nodeId : downstreamEmptyImage ? downstreamEmptyImage.id : nanoid();
                     const imageIds = Array.from({ length: count }, () => nanoid());
                     pendingChildIds = [rootId];
                     const rootNode: CanvasNodeData = {
                         id: rootId,
                         type: CanvasNodeType.Image,
-                        title: effectivePrompt.slice(0, 32) || "Generated Image",
-                        position: {
-                            x: reuseImageNode ? parentPosition.x : parentPosition.x + parentConfig.width + 96,
-                            y: parentPosition.y + parentConfig.height / 2 - imageConfig.height / 2,
-                        },
-                        width: reuseImageNode ? sourceNode?.width || imageConfig.width : imageConfig.width,
-                        height: reuseImageNode ? sourceNode?.height || imageConfig.height : imageConfig.height,
+                        title: downstreamEmptyImage?.title || effectivePrompt.slice(0, 32) || "Generated Image",
+                        position: downstreamEmptyImage
+                            ? downstreamEmptyImage.position
+                            : {
+                                  x: reuseImageNode ? parentPosition.x : parentPosition.x + parentConfig.width + 96,
+                                  y: parentPosition.y + parentConfig.height / 2 - imageConfig.height / 2,
+                              },
+                        width: reuseImageNode ? sourceNode?.width || imageConfig.width : downstreamEmptyImage?.width || imageConfig.width,
+                        height: reuseImageNode ? sourceNode?.height || imageConfig.height : downstreamEmptyImage?.height || imageConfig.height,
                         metadata: {
                             prompt: effectivePrompt,
                             status: NODE_STATUS_LOADING,
@@ -2800,11 +2813,16 @@ function InfiniteCanvasPage() {
                                               height: parentConfig.height,
                                               metadata: { ...node.metadata, content: prompt, prompt, status: NODE_STATUS_SUCCESS, fontSize: 14, errorDetails: undefined },
                                           }
-                                : node,
+                                : reuseDownstreamImage && node.id === rootId
+                                  ? {
+                                        ...node,
+                                        metadata: { ...node.metadata, ...rootNode.metadata, content: undefined, storageKey: undefined, errorDetails: undefined },
+                                    }
+                                  : node,
                         ),
-                        ...(reuseImageNode ? [] : [rootNode]),
+                        ...(reuseImageNode || reuseDownstreamImage ? [] : [rootNode]),
                     ]);
-                    if (!reuseImageNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]);
+                    if (!reuseImageNode && !reuseDownstreamImage) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]);
                     setSelectedNodeIds(new Set([nodeId]));
                     setSelectedConnectionId(null);
                     setDialogNodeId(nodeId);
