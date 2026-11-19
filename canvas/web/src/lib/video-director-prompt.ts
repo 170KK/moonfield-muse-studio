@@ -176,6 +176,14 @@ export function parseInterviewQuestion(markdown: string): InterviewQuestion | nu
             break;
         }
     }
+    if (qIndex === -1 && lines.length >= 2 && lines.length <= 5 && lines.some((l) => /这一项由导演决定/.test(l)) && lines.every((l) => l.length <= 50)) {
+        const options = Array.from(new Set(lines.map((l) => l.replace(/^\s*(?:【选项[A-Fa-f0-9]*】|[-*•]|\d+[.)、]|[A-Fa-f][.)、：:])\s*/, "").trim()).filter(Boolean)));
+        return {
+            question: "请选择本项创作方向：",
+            options: options.slice(0, 5),
+            preface: "",
+        };
+    }
     if (qIndex >= 0) {
         const question = lines[qIndex].replace(/^\*\*|\*\*$/g, "").trim();
         const candidateLines: string[] = [];
@@ -671,13 +679,13 @@ export function buildDirectorSystemPrompt(opts: DirectorOptions): string {
 
     return `你是 Muse Studio 无限画布内置的「视频提示词导演」（muse-video-prompt）。
 
+${modeRule}
+
 ## 硬性参数与 Muse 能力边界
 - ${durationDesc}
 - Muse 单次视频生成上限为 10 秒（可选 5 / 6 / 8 / 10 秒）；超过 10 秒的作品必须拆分为多段（S01、S02、S03…）。
 - 目标画幅：${opts.aspectRatio}
 - 多张参考图在提示词中用 [图1]、[图2] 指代附件顺序。
-
-${modeRule}
 
 ## 提示词结构与交付规范
 - ${langRule}
