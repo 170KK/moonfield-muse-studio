@@ -408,32 +408,48 @@ function InfiniteCanvasPage() {
         [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, startGenerationRequest, t],
     );
 
+    const isNodeGenerating = useCallback(
+        (node: CanvasNodeData) =>
+            runningNodeId === node.id ||
+            node.metadata?.status === NODE_STATUS_LOADING ||
+            Boolean(node.metadata?.images?.some((img) => img.status === NODE_STATUS_LOADING)) ||
+            Boolean(node.metadata?.videos?.some((vid) => vid.status === NODE_STATUS_LOADING)) ||
+            Boolean(node.metadata?.texts?.some((txt) => txt.status === NODE_STATUS_LOADING)),
+        [runningNodeId],
+    );
+
     const stopGenerationByRunningId = useCallback((runningId: string) => {
-        const affectedNodeIds = new Set<string>();
+        const affectedNodeIds = new Set<string>([runningId]);
         generationRequestsRef.current.forEach((request) => {
-            if (request.runningNodeId !== runningId) return;
+            if (request.runningNodeId !== runningId && request.targetNodeId !== runningId && request.originNodeId !== runningId) return;
             request.controller.abort();
             generationRequestsRef.current.delete(request.targetNodeId);
             affectedNodeIds.add(request.targetNodeId);
             affectedNodeIds.add(request.originNodeId);
         });
         setRunningNodeId((current) => (current === runningId ? null : current));
-        if (!affectedNodeIds.size) return;
         setNodes((prev) =>
-            prev.map((node) =>
-                affectedNodeIds.has(node.id) && node.metadata?.status === NODE_STATUS_LOADING
-                    ? {
-                          ...node,
-                          metadata: {
-                              ...node.metadata,
-                              status: NODE_STATUS_IDLE,
-                              errorDetails: undefined,
-                              images: node.metadata.images?.map((image) => (image.status === NODE_STATUS_LOADING ? { ...image, status: NODE_STATUS_ERROR, errorDetails: t("common.requestCanceled") } : image)),
-                              texts: node.metadata.texts?.map((text) => (text.status === NODE_STATUS_LOADING ? { ...text, status: NODE_STATUS_ERROR, errorDetails: t("common.requestCanceled") } : text)),
-                          },
-                      }
-                    : node,
-            ),
+            prev.map((node) => {
+                if (!affectedNodeIds.has(node.id)) return node;
+                const hasLoadingImages = Boolean(node.metadata?.images?.some((img) => img.status === NODE_STATUS_LOADING));
+                const hasLoadingVideos = Boolean(node.metadata?.videos?.some((vid) => vid.status === NODE_STATUS_LOADING));
+                const hasLoadingTexts = Boolean(node.metadata?.texts?.some((txt) => txt.status === NODE_STATUS_LOADING));
+                if (node.metadata?.status !== NODE_STATUS_LOADING && !hasLoadingImages && !hasLoadingVideos && !hasLoadingTexts) {
+                    return node;
+                }
+                const nextStatus = node.metadata?.content ? NODE_STATUS_SUCCESS : NODE_STATUS_IDLE;
+                return {
+                    ...node,
+                    metadata: {
+                        ...node.metadata,
+                        status: nextStatus,
+                        errorDetails: undefined,
+                        images: node.metadata?.images?.map((image) => (image.status === NODE_STATUS_LOADING ? { ...image, status: NODE_STATUS_ERROR, errorDetails: t("common.requestCanceled") } : image)),
+                        videos: node.metadata?.videos?.map((video) => (video.status === NODE_STATUS_LOADING ? { ...video, status: NODE_STATUS_ERROR, errorDetails: t("common.requestCanceled") } : video)),
+                        texts: node.metadata?.texts?.map((text) => (text.status === NODE_STATUS_LOADING ? { ...text, status: NODE_STATUS_ERROR, errorDetails: t("common.requestCanceled") } : text)),
+                    },
+                };
+            }),
         );
     }, [t]);
 
@@ -3801,7 +3817,7 @@ function InfiniteCanvasPage() {
                 <CanvasNodePromptPanel
                     node={panelNode}
                     nodes={nodes}
-                    isRunning={runningNodeId === panelNode.id}
+                    isRunning={isNodeGenerating(panelNode)}
                     mentionReferences={mentionReferencesByNodeId.get(panelNode.id) || EMPTY_REFERENCES}
                     connectedNodes={connectedNodesByNodeId.get(panelNode.id) || []}
                     onPromptChange={handleNodePromptChange}
@@ -3823,14 +3839,14 @@ function InfiniteCanvasPage() {
                     }}
                 />
             ),
-        [configInputsById, confirmStopGeneration, connectedNodesByNodeId, disconnectNodeReference, handleConfigNodeChange, handleGenerateNode, handleNodePromptChange, handleRegenerateVideoInPlace, mentionReferencesByNodeId, nodes, renderPluginPanel, runningNodeId, startNodeReferenceSelection],
+        [configInputsById, confirmStopGeneration, connectedNodesByNodeId, disconnectNodeReference, handleConfigNodeChange, handleGenerateNode, handleNodePromptChange, handleRegenerateVideoInPlace, isNodeGenerating, mentionReferencesByNodeId, nodes, renderPluginPanel, startNodeReferenceSelection],
     );
 
     const renderNodeContentPanel = useCallback(
         (contentNode: CanvasNodeData) => (
             <CanvasConfigNodePanel
                 node={contentNode}
-                isRunning={runningNodeId === contentNode.id}
+                isRunning={isNodeGenerating(contentNode)}
                 inputSummary={getInputSummary(configInputsById.get(contentNode.id) || [])}
                 onConfigChange={handleConfigNodeChange}
                 onComposerToggle={() => setDialogNodeId((current) => (current === contentNode.id ? null : contentNode.id))}
@@ -3841,7 +3857,7 @@ function InfiniteCanvasPage() {
                 }}
             />
         ),
-        [configInputsById, confirmStopGeneration, handleConfigNodeChange, handleGenerateNode, runningNodeId],
+        [configInputsById, confirmStopGeneration, handleConfigNodeChange, handleGenerateNode, isNodeGenerating],
     );
 
     const hoverPreviewNode = hoverPreviewNodeId ? nodeById.get(hoverPreviewNodeId) || null : null;

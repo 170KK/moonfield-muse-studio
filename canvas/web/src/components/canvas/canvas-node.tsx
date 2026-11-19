@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Copy, CopyPlus, Download, Group, Image as ImageIcon, Music2, Play, Puzzle, RefreshCw, Star, Trash2, Video } from "lucide-react";
+import { ChevronRight, Copy, CopyPlus, Download, Group, Image as ImageIcon, Loader2, Music2, Play, Puzzle, RefreshCw, Star, Trash2, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
@@ -778,6 +778,7 @@ function VideoNodeContent({ node, theme, scale, batchExpanded, onToggleBatch, on
     const { t } = useTranslation();
     const videos = node.metadata?.videos || [];
     const batchCount = videos.length;
+    const loadingCount = videos.filter((v) => v.status === "loading").length;
     const isBatchRoot = batchCount > 1;
     const primaryVideoId = node.metadata?.primaryVideoId || videos[0]?.id;
     const primaryVideo = videos.find((v) => v.id === primaryVideoId);
@@ -815,9 +816,10 @@ function VideoNodeContent({ node, theme, scale, batchExpanded, onToggleBatch, on
                 {primaryContent ? (
                     <CanvasVideoPlayer src={primaryContent} className="h-full w-full rounded-[18px] bg-black object-contain" nodeId={node.id} />
                 ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ background: theme.node.fill, color: theme.node.activeStroke }}>
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 px-4 text-center" style={{ background: theme.node.fill, color: theme.node.activeStroke }}>
                         <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />
                         <span className="text-[10px] tracking-[0.2em]">{t("canvas.node.generating")}</span>
+                        <GeneratingElapsed hint="视频生成/轮询中 · 点下方停止可取消" />
                     </div>
                 )}
             </div>
@@ -825,7 +827,7 @@ function VideoNodeContent({ node, theme, scale, batchExpanded, onToggleBatch, on
                 <button
                     type="button"
                     className="absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(28,25,23,.16)] backdrop-blur-md transition hover:scale-[1.02]"
-                    style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
+                    style={{ background: theme.toolbar.panel, borderColor: loadingCount > 0 ? "#f59e0b" : theme.toolbar.border, color: theme.toolbar.activeText }}
                     aria-label={batchExpanded ? t("canvas.node.batchExpanded") : t("canvas.node.batchCollapsed")}
                     onClick={(event) => {
                         event.stopPropagation();
@@ -834,7 +836,10 @@ function VideoNodeContent({ node, theme, scale, batchExpanded, onToggleBatch, on
                     onMouseDown={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                 >
-                    <span className="leading-none">{batchCount} 个视频</span>
+                    {loadingCount > 0 ? <Loader2 className="size-3.5 shrink-0 animate-spin text-amber-500" /> : null}
+                    <span className="leading-none">
+                        {batchCount} 个视频{loadingCount > 0 ? ` · 生成中 ${loadingCount}` : ""}
+                    </span>
                     <ChevronRight className={`size-3.5 transition-transform duration-200 ${batchExpanded ? "rotate-90" : ""}`} />
                 </button>
             ) : null}
@@ -985,6 +990,7 @@ function ImageContent({
     useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision);
     const images = node.metadata?.images || [];
     const batchCount = images.length;
+    const loadingCount = images.filter((image) => image.status === "loading").length;
     const isBatchRoot = batchCount > 1;
     const primaryImageId = node.metadata?.primaryImageId || images[0]?.id;
     const primaryImage = images.find((image) => image.id === primaryImageId);
@@ -1037,7 +1043,7 @@ function ImageContent({
                         <button
                             type="button"
                             className="pointer-events-auto ml-auto flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-[11px] font-semibold shadow-[0_6px_18px_rgba(28,25,23,.16)] backdrop-blur-md transition hover:scale-[1.02]"
-                            style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
+                            style={{ background: theme.toolbar.panel, borderColor: loadingCount > 0 ? "#f59e0b" : theme.toolbar.border, color: theme.toolbar.activeText }}
                             aria-label={batchExpanded ? t("canvas.node.batchExpanded") : t("canvas.node.batchCollapsed")}
                             onClick={(event) => {
                                 event.stopPropagation();
@@ -1046,7 +1052,11 @@ function ImageContent({
                             onMouseDown={(event) => event.stopPropagation()}
                             onPointerDown={(event) => event.stopPropagation()}
                         >
-                            <span className="leading-none">{t("canvas.controls.images", { count: batchCount })}</span>
+                            {loadingCount > 0 ? <Loader2 className="size-3 shrink-0 animate-spin text-amber-500" /> : null}
+                            <span className="leading-none">
+                                {t("canvas.controls.images", { count: batchCount })}
+                                {loadingCount > 0 ? ` · ${loadingCount} 生成中` : ""}
+                            </span>
                             <ChevronRight className={`size-3.5 shrink-0 opacity-80 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
                         </button>
                     ) : null}
@@ -1144,14 +1154,29 @@ function BatchImageFailureActions({ placement, onRetry, onDelete }: { placement:
     );
 }
 
+function GeneratingElapsed({ hint }: { hint?: string }) {
+    const [sec, setSec] = useState(0);
+    useEffect(() => {
+        const timer = window.setInterval(() => setSec((prev) => prev + 1), 1000);
+        return () => window.clearInterval(timer);
+    }, []);
+    return (
+        <div className="flex flex-col items-center gap-0.5 text-[10px] opacity-75">
+            <span>已等待 {sec}s</span>
+            {hint ? <span className="max-w-[140px] leading-tight">{hint}</span> : null}
+        </div>
+    );
+}
+
 function ImageSlotStatus({ image }: { image?: CanvasNodeImage }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { t } = useTranslation();
     const failed = image?.status === "error";
     return (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center" style={{ background: theme.node.fill, color: failed ? theme.node.text : theme.node.activeStroke }}>
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 px-4 text-center" style={{ background: theme.node.fill, color: failed ? theme.node.text : theme.node.activeStroke }}>
             {failed ? <span className="text-xs leading-5">{image.errorDetails || t("canvas.node.failed")}</span> : <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />}
             {!failed ? <span className="text-[10px] tracking-[0.2em]">{t("canvas.node.generating")}</span> : null}
+            {!failed ? <GeneratingElapsed hint="出图请求中 · 点停止可取消" /> : null}
         </div>
     );
 }
