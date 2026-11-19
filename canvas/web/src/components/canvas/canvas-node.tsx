@@ -1030,11 +1030,11 @@ function ImageContent({
             </div>
             {primaryImage?.status === "error" ? <BatchImageFailureActions placement="left" onRetry={() => onRetryBatchImage?.(primaryImage.id)} onDelete={() => onDeleteBatchImage?.(primaryImage.id)} /> : null}
             {primaryImage?.content || isBatchRoot ? (
-                <div className="pointer-events-none absolute inset-x-2 top-2 z-30 flex flex-wrap items-center justify-between gap-1">
+                <div className="pointer-events-none absolute inset-x-1.5 top-1.5 z-30 flex items-center justify-between gap-1">
                     {primaryImage?.content ? (
-                        <button type="button" className="pointer-events-none flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium opacity-0 shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02] group-hover/node:pointer-events-auto group-hover/node:opacity-100" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownloadBatchImage?.(primaryImage.id))}>
+                        <button type="button" className="pointer-events-none flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-[10px] font-medium opacity-0 shadow-[0_4px_12px_rgba(15,23,42,.18)] backdrop-blur-md transition hover:scale-[1.03] group-hover/node:pointer-events-auto group-hover/node:opacity-100" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownloadBatchImage?.(primaryImage.id))}>
                             <Download className="size-3 shrink-0" />
-                            <span>{t("common.download")}</span>
+                            {node.width >= 220 ? <span>{t("common.download")}</span> : null}
                         </button>
                     ) : (
                         <span />
@@ -1042,9 +1042,10 @@ function ImageContent({
                     {isBatchRoot ? (
                         <button
                             type="button"
-                            className="pointer-events-auto ml-auto flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-[11px] font-semibold shadow-[0_6px_18px_rgba(28,25,23,.16)] backdrop-blur-md transition hover:scale-[1.02]"
+                            className="pointer-events-auto ml-auto flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 text-[10px] font-semibold shadow-[0_4px_12px_rgba(28,25,23,.18)] backdrop-blur-md transition hover:scale-[1.03]"
                             style={{ background: theme.toolbar.panel, borderColor: loadingCount > 0 ? "#f59e0b" : theme.toolbar.border, color: theme.toolbar.activeText }}
                             aria-label={batchExpanded ? t("canvas.node.batchExpanded") : t("canvas.node.batchCollapsed")}
+                            title={loadingCount > 0 ? `${batchCount} 张 · ${loadingCount} 张生成中` : t("canvas.controls.images", { count: batchCount })}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onToggleBatch?.();
@@ -1052,12 +1053,12 @@ function ImageContent({
                             onMouseDown={(event) => event.stopPropagation()}
                             onPointerDown={(event) => event.stopPropagation()}
                         >
-                            {loadingCount > 0 ? <Loader2 className="size-3 shrink-0 animate-spin text-amber-500" /> : null}
+                            {loadingCount > 0 ? <Loader2 className="size-2.5 shrink-0 animate-spin text-amber-500" /> : null}
                             <span className="leading-none">
                                 {t("canvas.controls.images", { count: batchCount })}
-                                {loadingCount > 0 ? ` · ${loadingCount} 生成中` : ""}
+                                {loadingCount > 0 ? ` (${loadingCount}⏳)` : ""}
                             </span>
-                            <ChevronRight className={`size-3.5 shrink-0 opacity-80 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
+                            <ChevronRight className={`size-3 shrink-0 opacity-80 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
                         </button>
                     ) : null}
                 </div>
@@ -1118,18 +1119,18 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
         >
             {image.content ? <img src={source} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" /> : <ImageSlotStatus image={image} />}
             {image.content ? (
-                <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/node:pointer-events-auto group-hover/node:opacity-100">
-                    <button type="button" className="flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>
+                <div className="pointer-events-none absolute inset-x-1.5 top-1.5 flex items-center justify-end gap-1 opacity-0 transition-opacity duration-150 group-hover/node:pointer-events-auto group-hover/node:opacity-100">
+                    <button type="button" className="flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-[10px] font-medium shadow-[0_4px_12px_rgba(15,23,42,.18)] backdrop-blur-md transition hover:scale-[1.03]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>
                         <Download className="size-3 shrink-0" />
-                        <span>{t("common.download")}</span>
+                        {node.width >= 240 ? <span>{t("common.download")}</span> : null}
                     </button>
-                    <button type="button" className="flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.createCopy")} onClick={(event) => (event.stopPropagation(), onDuplicate())}>
+                    <button type="button" className="flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-[10px] font-medium shadow-[0_4px_12px_rgba(15,23,42,.18)] backdrop-blur-md transition hover:scale-[1.03]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.createCopy")} onClick={(event) => (event.stopPropagation(), onDuplicate())}>
                         <Copy className="size-3 shrink-0" />
-                        <span>{t("canvas.node.createCopy")}</span>
+                        {node.width >= 240 ? <span>{t("canvas.node.createCopy")}</span> : null}
                     </button>
-                    <button type="button" className="flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.setPrimary")} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
+                    <button type="button" className="flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-[10px] font-medium shadow-[0_4px_12px_rgba(15,23,42,.18)] backdrop-blur-md transition hover:scale-[1.03]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.setPrimary")} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
                         <Star className="size-3 shrink-0" style={{ color: selectionBlue }} />
-                        <span>{t("canvas.node.setPrimary")}</span>
+                        {node.width >= 240 ? <span>{t("canvas.node.setPrimary")}</span> : null}
                     </button>
                 </div>
             ) : null}
