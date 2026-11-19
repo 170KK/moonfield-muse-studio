@@ -704,9 +704,9 @@ function InfiniteCanvasPage() {
             }
 
             const assetEntries: Array<{ name: string; kind: "人物资产" | "场景资产" | "道具资产"; label: string; prompt: string; aiPrompt: string; size: string }> = [
-                ...workflow.characters.map((c) => ({ name: c.name, kind: "人物资产" as const, label: `角色三视图与表情 · ${c.name}`, prompt: c.prompt, aiPrompt: extractAiPromptForGeneration(c.prompt), size: "16:9" })),
-                ...workflow.scenes.map((s) => ({ name: s.name, kind: "场景资产" as const, label: `场景设定 · ${s.name}`, prompt: s.prompt, aiPrompt: extractAiPromptForGeneration(s.prompt), size: aspectRatio })),
-                ...workflow.props.map((p) => ({ name: p.name, kind: "道具资产" as const, label: `道具三视图 · ${p.name}`, prompt: p.prompt, aiPrompt: extractAiPromptForGeneration(p.prompt), size: "16:9" })),
+                ...workflow.characters.map((c) => ({ name: c.name, kind: "人物资产" as const, label: `角色定妆照 · ${c.name}`, prompt: c.prompt, aiPrompt: extractAiPromptForGeneration(c.prompt), size: "3:4" })),
+                ...workflow.scenes.map((s) => ({ name: s.name, kind: "场景资产" as const, label: `场景空镜照 · ${s.name}`, prompt: s.prompt, aiPrompt: extractAiPromptForGeneration(s.prompt), size: aspectRatio })),
+                ...workflow.props.map((p) => ({ name: p.name, kind: "道具资产" as const, label: `道具实拍照 · ${p.name}`, prompt: p.prompt, aiPrompt: extractAiPromptForGeneration(p.prompt), size: "1:1" })),
             ];
 
             // 第 2-3 列：全局资产拆解（人物三视图+表情 / 场景空镜 / 道具三视图）

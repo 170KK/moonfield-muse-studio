@@ -377,8 +377,8 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
                     characters.push({
                         name,
                         prompt: formatBilingualNodePrompt(
-                            `角色三视图与常用表情设定图（${name}）：纯白干净背景，左侧为正面、侧面、背面全身三视图，右侧为喜/怒/惊/痛等常用表情头像矩阵，同一张图内完整展示；外貌与服装锁定：${line}；必须空手自然站立，身上严禁佩戴或手持任何武器、长剑、刀鞘或道具；五官可辨不过度锐化，自然皮肤质感，无文字无水印。`,
-                            `Character turnaround sheet & common expressions (${name}) on clean pure white background: full-body three-view turnaround (front, side, back) alongside a common facial expressions grid in one unified sheet; locked appearance & outfit: ${line}; empty-handed standing pose, NO weapons, NO swords, NO scabbards, NO handheld props; natural skin texture, photorealistic, no text, no watermark.`,
+                            `真人实拍正面定妆照（${name}）：${line}；空手自然站立无武器道具，干净浅灰背景，自然柔和光，真实皮肤纹理与自然颗粒，85mm人像镜头，无文字无水印。`,
+                            `Live-action portrait photograph, front-facing casting photo of ${name}: ${line}; empty-handed standing pose with no weapons or props, clean light-gray studio background, soft natural lighting, natural skin texture, 85mm lens, no text, no watermark.`,
                         ),
                     });
                 }
@@ -394,8 +394,8 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
                         characters.push({
                             name,
                             prompt: formatBilingualNodePrompt(
-                                `角色三视图与常用表情设定图（${name}）：纯白干净背景，左侧为正面、侧面、背面全身三视图，右侧为喜/怒/惊/痛等常用表情头像矩阵，同一张图内完整展示，必须空手自然站立，身上严禁佩戴或手持任何武器、长剑、刀鞘或道具；五官发型服装材质前后严格一致，自然皮肤质感，无文字无水印。`,
-                                `Character turnaround sheet & common expressions (${name}) on clean pure white background: full-body three-view turnaround (front, side, back) alongside a grid of common facial expressions (neutral, angry, shocked, pain) in one unified sheet, empty-handed standing pose, NO weapons, NO swords, NO scabbards, NO handheld props, consistent facial features, hair and outfit, photorealistic, no text, no watermark.`,
+                                `真人实拍正面定妆照（${name}）：${part}，空手自然站立无武器道具，干净浅灰背景，自然柔和光，真实皮肤纹理与自然颗粒，85mm人像镜头，无文字无水印。`,
+                                `Live-action portrait photograph, front-facing casting photo of ${name}: ${part}, empty-handed standing pose with no weapons or props, clean light-gray studio background, soft natural lighting, natural skin texture, 85mm lens, no text, no watermark.`,
                             ),
                         });
                     }
@@ -434,8 +434,8 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
                     props.push({
                         name: propName,
                         prompt: formatBilingualNodePrompt(
-                            `关键道具三视图设定图（${propName}）：纯白干净背景，正面/侧面/俯视三视图同框；道具细节锁定：${line}；超写实材质纹理与几何结构，无人物无文字无水印。`,
-                            `Key prop three-view turnaround sheet (${propName}) on clean pure white background: front, side, and top views in one unified sheet; locked details: ${line}; photorealistic material texture and structure, no people, no text, no watermark.`,
+                            `实拍道具特写照片（${propName}）：${line}；干净浅色背景，自然光，真实材质质感，无人物无文字无水印。`,
+                            `Live-action close-up photograph of prop (${propName}): ${line}; clean light background, natural lighting, realistic material texture, no people, no text, no watermark.`,
                         ),
                     });
                 }
@@ -467,8 +467,8 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
         if (!seg.firstFramePrompt) {
             const overview = seg.prompt.match(/【(?:本段概览|Subject and Space|Segment Overview)】([^\n【]+)/)?.[1]?.trim() || seg.prompt.slice(0, 180);
             seg.firstFramePrompt = formatBilingualNodePrompt(
-                `【${seg.id} 分镜首帧参考图】严格参考已连入的人物三视图、场景空镜与道具设定，保持角色外貌服装与环境光影完全一致。画面内容：${overview}`,
-                `[${seg.id} Keyframe Reference] Strictly follow the connected character turnaround, scene, and prop references for consistent appearance, outfit, and lighting. Composition: ${overview}`,
+                `【${seg.id} 分镜首帧实拍参考图】参考已连入的人物定妆照、场景与道具照片保持一致，${overview}，自然光影与皮肤质感，无文字无水印`,
+                `[${seg.id} Live-Action Keyframe] Keep connected character, scene, and prop references consistent; ${overview}, natural lighting and skin texture, no text, no watermark`,
             );
         }
     });
@@ -593,13 +593,13 @@ export function buildWorkflowExtractPrompt(scriptText: string, aspectRatio: "16:
 必须放在 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 之间，不要使用 markdown 代码块，JSON 字符串内部换行一律用 \\n 转义！
 
 ===WORKFLOW_JSON_START===
-{"negativePrompt":"全局负面提示词（英文优先，如：no text, no watermark, no distortion）","characters":[{"name":"角色名","prompt":"角色全身三视图+常用表情矩阵中文注解（同一张图包含正面/侧面/背面全身三视图与喜怒惊痛等常用表情头像，纯白背景，外貌服装细节，必须空手自然站立且身上不佩戴、不手持任何武器或道具）","enPrompt":"Character sheet on pure white background: full-body three-view turnaround (front, side, back) and common facial expressions grid (neutral, angry, shocked, pain) all in one unified sheet, empty-handed standing pose, NO weapons, NO swords, NO scabbards, NO handheld props, consistent face, hair, outfit and material, photorealistic, no text"}],"scenes":[{"name":"核心场景名","prompt":"空镜场景设定图中文注解（${aspectRatio}画幅，空间结构、光线色温、无人物）","enPrompt":"Empty scene concept art, ${aspectRatio} widescreen, spatial layout, lighting and color temperature, photorealistic cinematic texture, no people, no text"}],"props":[{"name":"道具名","prompt":"关键道具三视图中文注解（同一张图包含正面/侧面/俯视三视图，纯白背景，材质纹理结构）","enPrompt":"Key prop three-view turnaround sheet (front, side, top) on clean white background, detailed material texture and geometry, photorealistic, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01分镜参考图/首帧中文注解（结合所需资产描述该镜头构图、景别、站位与光影）","firstFrameEnPrompt":"S01 keyframe reference image English prompt combining character/scene/prop layout, framing and lighting, photorealistic","prompt":"S01完整中文视频动态提示词","enPrompt":"S01 complete English video motion prompt","negativePrompt":"S01 negative prompt"}]}
+{"negativePrompt":"no text, no watermark, no logo, no over-sharpened plastic skin","characters":[{"name":"角色名","prompt":"真人实拍正面定妆照中文描述（年龄外貌、核心服装、空手站立无武器道具、浅灰背景、自然光、真实皮肤纹理、85mm镜头）","enPrompt":"Live-action front-facing casting photograph of [name], core age/appearance/outfit, empty-handed with no weapons or props, clean studio background, soft natural light, natural skin texture, 85mm lens, no text"}],"scenes":[{"name":"核心场景名","prompt":"真人实拍空镜照片（${aspectRatio}画幅，核心环境与自然光线，无人物）","enPrompt":"Live-action empty scene photograph, ${aspectRatio}, core environment and natural lighting, no people, no text"}],"props":[{"name":"道具名","prompt":"实拍道具特写照片（核心材质与外观，干净背景，自然光，无人物）","enPrompt":"Live-action close-up photograph of prop, realistic material texture, clean background, natural light, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01精简首帧实拍参考图提示词（参考已连入人物/场景/道具，写清景别、站位与光线，减少冗余词）","firstFrameEnPrompt":"S01 concise live-action keyframe photograph matching connected references, framing, pose and natural lighting, no text","prompt":"S01精简写实中文视频提示词（只写核心人物状态、景别运镜、关键动作、光线与无文字水印，不堆砌冗余词）","enPrompt":"S01 concise live-action video prompt focusing on subject, framing, camera move, action and natural lighting, no text","negativePrompt":"S01 negative prompt"}]}
 ===WORKFLOW_JSON_END===
 
 硬性规则：
 1. 【全局共享资产先拆】：从剧本中提取所有独立【角色】【核心物理场景】【关键道具】，全局共享复用——严禁把 S01..S06 分镜本身拆成 6 张假场景卡！
-2. 【人物卡要求】：每个人物必须要求「全身三视图（正/侧/背）+ 常用表情矩阵」全部画在同一张纯白背景图里，且**必须空手站立、严禁佩戴或手持任何武器/剑/道具**（道具统一放到 props 单独拆三视图）；【道具卡要求】：每个关键道具必须要求「三视图」画在同一张纯白背景图里；所有资产均需同时提供中文 prompt 与英文 enPrompt。
-3. 【分镜资产绑定与参考图】：segments 必须按 Muse 单段 ≤10 秒上限拆分（${durHint}）；每个分镜必须通过 assetRefs 列出该分镜实际用到的资产 name，并同时提供用于生成分镜参考图/首帧图的 firstFramePrompt + firstFrameEnPrompt，以及用于生成视频的 prompt + enPrompt！
+2. 【人物卡只要单人正面实拍定妆照】：严禁写“三视图、表情矩阵、多视图”等易引发插画/CG感的词；每张人物卡只生成一张**真人实拍正面定妆照**，且**必须空手站立、不佩戴/不手持任何武器或道具**；【道具卡】：只生成单件实拍特写照片（也不用三视图）。
+3. 【精简少干扰原则】：人物、场景、道具、分镜参考图、分镜视频提示词全部保持**简洁直白、少干扰词**（只留基础设定与核心动作/机位/光线），依靠参考图连线保证人物与画风一致！
 
 待拆分的导演脚本如下：
 ${scriptText}`;
@@ -634,21 +634,19 @@ export function buildDirectorSystemPrompt(opts: DirectorOptions): string {
 
     const lengthRule =
         opts.detailLevel === "detailed"
-            ? `采用【详细导演版 + 去 AI 感写实规范】：每段提示词严禁只写空洞形容词，必须写实落细 7 个要素：
-  1) 【人物】：具体年龄/体型/发型/自然妆容/微表情，写明「五官可辨但不处处锐利、自然皮肤质感与透亮肤色」；
-  2) 【服装】：具体单品+颜色+面料材质+版型+物理垂坠/随风微扬，写明「服装全程不变」；
-  3) 【场景】：室内外具体空间+前景/中景/背景真实材质物件+背景轻微虚化，「场景固定」；
-  4) 【光线】：主光方向+软硬（如暖色柔光正面打/柔和漫射光）+皮肤与面料自然反光+暗部微弱颗粒；
-  5) 【机位光学】：明确 ${opts.aspectRatio} 画幅+具体景别（全身/中近景腰腹以上/大腿以上）+眼平或手持视角+焦段（如 85mm 长焦/轻微移轴/浅景深）+运镜轨迹；
-  6) 【动作时间线】：0-3s / 3-7s / 7-10s 起止姿态、呼吸起伏、重心移动与物理惯性；
-  7) 【真实质感与避坑】：主动保留「轻微动态拖影、短暂失焦、自然颗粒与少量彩噪、轻微晃动或平稳跟随」，严禁使用「强稳定、全程处处锐利、完美无瑕」等加重 AI 塑料感的词，并明确「无文字水印、无任何文字、无 logo」。英文版完整对应。`
-            : `采用【精简写实版（去 AI 感）】：每段保留【本段最高优先级】【本段概览】【输出形式】与核心 7 要素（人物肤质、服装面料版型不变、场景元素与虚化、主光软硬与反光、景别焦段运镜、动作起止与呼吸感、轻微拖影/自然颗粒/无文字水印），每段中文约 320–480 字，英文完整对应。`;
+            ? `采用【精简实拍导演版（去 AI 感、少干扰词）】：不要堆砌几十个形容词和繁琐约束，每段中文约 120–240 字，只写清 5 个核心信息：
+  1) 人物与服装保持一致（不写多余细节，避免抹平真实感）；
+  2) 场景与自然光线（主光方向、真实环境与轻微颗粒/景深）；
+  3) ${opts.aspectRatio} 画幅、景别与镜头运动（如 85mm 镜头、推近/跟随、保留轻微自然晃动与动态拖影）；
+  4) 起止动作与节奏（0-3s / 3-7s / 7-10s 直观动作）；
+  5) 简短避坑词（「无文字水印、无多余人物」）。英文版精简对应。`
+            : `采用【极简实拍版（少干扰词）】：每段中文约 80–150 字，只保留谁+穿什么、在哪+什么光、景别运镜、起止动作和「无文字水印」，依靠参考图锁定人物与画风一致性；英文完整对应。`;
 
     const jsonTailRule = `
 ## 正式交付时的画布拆分 JSON（必须在交付最终提示词时附在最末尾）
 当你输出正式分镜/视频提示词（非提问阶段）时，在回复的最末尾**必须**用 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 包裹一个合法的 JSON 对象（**不要使用 \`\`\`json 代码块，且字符串内换行必须用 \\n 转义**）：
 ===WORKFLOW_JSON_START===
-{"negativePrompt":"no text, no watermark, no logo, no over-sharpened plastic skin, no distortion","characters":[{"name":"角色名","prompt":"角色全身三视图+常用表情矩阵中文注解（纯白背景，正面/侧面/背面全身三视图与常用表情头像画在同一张图内，写清五官发型肤质服装面料，必须空手站立不佩戴任何武器或道具）","enPrompt":"Character turnaround sheet & common facial expressions grid on pure white background (front, side, back full-body views + expression portraits in one unified sheet), empty-handed standing pose, NO weapons, NO swords, NO scabbards, NO handheld props, natural skin texture, detailed outfit fabric, photorealistic, no text, no watermark"}],"scenes":[{"name":"核心场景名","prompt":"空镜场景设定图中文注解（${opts.aspectRatio}画幅，空间结构、光线方向软硬、材质与背景虚化，无人物无文字）","enPrompt":"Empty scene concept art, ${opts.aspectRatio} widescreen, spatial layout, lighting direction and softness, material texture, no people, no text, no watermark"}],"props":[{"name":"道具名","prompt":"关键道具三视图中文注解（纯白背景，正面/侧面/俯视三视图画在同一张图内，写清材质纹理结构）","enPrompt":"Key prop three-view turnaround sheet (front, side, top) on pure white background, detailed material texture, photorealistic, no people, no text, no watermark"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01分镜首帧参考图中文注解（结合人物服装、场景光影、景别焦段与站位）","firstFrameEnPrompt":"S01 keyframe reference image prompt combining character outfit, scene lighting, framing, lens and pose, natural skin texture, no text","prompt":"S01完整中文视频动态提示词","enPrompt":"S01 complete English video prompt"}]}
+{"negativePrompt":"no text, no watermark, no logo","characters":[{"name":"角色名","prompt":"真人实拍正面定妆照（空手站立无武器道具、干净浅灰背景、自然光、真实皮肤纹理、85mm镜头）","enPrompt":"Live-action front-facing casting photograph, empty-handed no weapons or props, clean studio background, soft natural light, natural skin texture, 85mm lens, no text"}],"scenes":[{"name":"核心场景名","prompt":"真人实拍空镜照片（${opts.aspectRatio}画幅，核心环境与自然光线，无人物）","enPrompt":"Live-action empty scene photograph, ${opts.aspectRatio}, core environment and natural lighting, no people, no text"}],"props":[{"name":"道具名","prompt":"实拍道具特写照片（干净浅色背景，自然光，真实材质，无人物）","enPrompt":"Live-action close-up photograph of prop, clean light background, natural light, realistic texture, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01精简首帧实拍参考图（景别、人物站位、光线）","firstFrameEnPrompt":"S01 concise live-action keyframe photograph, framing, pose, natural lighting, no text","prompt":"S01精简中文视频提示词","enPrompt":"S01 concise English video prompt"}]}
 ===WORKFLOW_JSON_END===`;
 
     const modeRule = {
