@@ -702,19 +702,20 @@ function InfiniteCanvasPage() {
                 newNodes.push(scriptNode);
             }
 
-            const assetEntries: Array<{ label: string; prompt: string; aiPrompt: string; size: string }> = [
-                ...workflow.characters.map((c) => ({ label: `角色三视图 · ${c.name}`, prompt: c.prompt, aiPrompt: extractAiPromptForGeneration(c.prompt), size: "16:9" })),
-                ...workflow.scenes.map((s) => ({ label: `场景设定 · ${s.name}`, prompt: s.prompt, aiPrompt: extractAiPromptForGeneration(s.prompt), size: aspectRatio })),
-                ...workflow.props.map((p) => ({ label: `道具设定 · ${p.name}`, prompt: p.prompt, aiPrompt: extractAiPromptForGeneration(p.prompt), size: "1:1" })),
+            const assetEntries: Array<{ name: string; kind: "人物资产" | "场景资产" | "道具资产"; label: string; prompt: string; aiPrompt: string; size: string }> = [
+                ...workflow.characters.map((c) => ({ name: c.name, kind: "人物资产" as const, label: `角色三视图与表情 · ${c.name}`, prompt: c.prompt, aiPrompt: extractAiPromptForGeneration(c.prompt), size: "16:9" })),
+                ...workflow.scenes.map((s) => ({ name: s.name, kind: "场景资产" as const, label: `场景设定 · ${s.name}`, prompt: s.prompt, aiPrompt: extractAiPromptForGeneration(s.prompt), size: aspectRatio })),
+                ...workflow.props.map((p) => ({ name: p.name, kind: "道具资产" as const, label: `道具三视图 · ${p.name}`, prompt: p.prompt, aiPrompt: extractAiPromptForGeneration(p.prompt), size: "16:9" })),
             ];
 
-            // 竖向分层流水线：设定卡一列竖排 -> 设定图一列竖排
+            // 第 2-3 列：全局资产拆解（人物三视图+表情 / 场景空镜 / 道具三视图）
             const sharedNegativePrompt = workflow.negativePrompt || workflow.segments.find((s) => s.negativePrompt)?.negativePrompt || "";
+            const assetImageByName = new Map<string, string>();
             const assetImageIds: string[] = [];
             assetEntries.forEach((item, idx) => {
                 const y = origin.y + idx * 290;
-                const cardNode = createCanvasNode(CanvasNodeType.Text, { x: origin.x + 360, y }, { content: item.prompt });
-                cardNode.title = item.label.replace("三视图", "设定卡").replace("设定 ·", "设定卡 ·");
+                const cardNode = createCanvasNode(CanvasNodeType.Text, { x: origin.x + 360, y }, { content: item.prompt, remark: item.kind });
+                cardNode.title = item.label;
                 const imgNode = createCanvasNode(CanvasNodeType.Image, { x: origin.x + 740, y }, {
                     model: effectiveConfig.imageModel || effectiveConfig.model,
                     size: computeMediaSize("2k", item.size),
@@ -722,34 +723,62 @@ function InfiniteCanvasPage() {
                     count: imageCount,
                     prompt: item.aiPrompt,
                     negativePrompt: sharedNegativePrompt,
+                    remark: item.kind,
                 });
                 imgNode.title = item.label;
                 newNodes.push(cardNode, imgNode);
                 if (scriptId) newConns.push({ id: nanoid(), fromNodeId: scriptId, toNodeId: cardNode.id });
                 newConns.push({ id: nanoid(), fromNodeId: cardNode.id, toNodeId: imgNode.id });
                 assetImageIds.push(imgNode.id);
+                assetImageByName.set(item.name, imgNode.id);
             });
 
-            // 分镜提示词一列竖排 -> 分镜视频一列竖排（S01 -> S02 -> S03 从上到下串联）
+            // 第 4-7 列：分镜参考图提示词 -> 分镜首帧/参考图 -> 分镜视频提示词 -> 分镜视频（S01 -> S02 连续接力）
             let prevVideoId: string | undefined;
             workflow.segments.forEach((seg, idx) => {
-                const y = origin.y + idx * 310;
-                const segTextNode = createCanvasNode(CanvasNodeType.Text, { x: origin.x + 1140, y }, { content: seg.prompt });
-                segTextNode.title = `${seg.id} 提示词 · ${seg.title}`;
-                const segVideoNode = createCanvasNode(CanvasNodeType.Video, { x: origin.x + 1540, y }, {
+                const y = origin.y + idx * 320;
+                const matchedAssetIds = (seg.assetRefs || [])
+                    .map((refName) => assetImageByName.get(refName) || [...assetImageByName.entries()].find(([k]) => k.includes(refName) || refName.includes(k))?.[1])
+                    .filter((id): id is string => Boolean(id));
+                const segAssetIds = matchedAssetIds.length ? Array.from(new Set(matchedAssetIds)) : assetImageIds;
+
+                const refPromptText = seg.firstFramePrompt?.trim() || `【${seg.id} 分镜首帧参考图】根据关联的人物、场景与道具资产生成 ${seg.title} 首帧参考画面`;
+                const segRefTextNode = createCanvasNode(CanvasNodeType.Text, { x: origin.x + 1140, y }, { content: refPromptText, remark: `${seg.id} 参考图提示词` });
+                segRefTextNode.title = `${seg.id} 参考图提示词 · ${seg.title}`;
+
+                const segRefImgNode = createCanvasNode(CanvasNodeType.Image, { x: origin.x + 1520, y }, {
+                    model: effectiveConfig.imageModel || effectiveConfig.model,
+                    size: computeMediaSize("2k", aspectRatio),
+                    quality: effectiveConfig.quality && effectiveConfig.quality !== "auto" ? effectiveConfig.quality : "high",
+                    count: imageCount,
+                    prompt: extractAiPromptForGeneration(refPromptText),
+                    negativePrompt: seg.negativePrompt || sharedNegativePrompt,
+                    remark: `${seg.id} 首帧参考图`,
+                });
+                segRefImgNode.title = `${seg.id} 首帧参考图 · ${seg.title}`;
+
+                const segTextNode = createCanvasNode(CanvasNodeType.Text, { x: origin.x + 1900, y }, { content: seg.prompt, remark: `${seg.id} 视频提示词` });
+                segTextNode.title = `${seg.id} 视频提示词 · ${seg.title}`;
+
+                const segVideoNode = createCanvasNode(CanvasNodeType.Video, { x: origin.x + 2280, y }, {
                     model: effectiveConfig.videoModel || effectiveConfig.model,
                     size: aspectRatio,
                     seconds: String(seg.duration || 10),
                     continuityMode: idx === 0 ? "ref-only" : "both",
                     prompt: extractAiPromptForGeneration(seg.prompt),
                     negativePrompt: seg.negativePrompt || sharedNegativePrompt,
+                    remark: `${seg.id} 视频`,
                 });
                 segVideoNode.title = `${seg.id} 视频 · ${seg.title}`;
-                newNodes.push(segTextNode, segVideoNode);
-                newConns.push({ id: nanoid(), fromNodeId: segTextNode.id, toNodeId: segVideoNode.id });
-                for (const imgId of assetImageIds) {
-                    newConns.push({ id: nanoid(), fromNodeId: imgId, toNodeId: segVideoNode.id });
+
+                newNodes.push(segRefTextNode, segRefImgNode, segTextNode, segVideoNode);
+                newConns.push({ id: nanoid(), fromNodeId: segRefTextNode.id, toNodeId: segRefImgNode.id });
+                for (const assetId of segAssetIds) {
+                    newConns.push({ id: nanoid(), fromNodeId: assetId, toNodeId: segRefImgNode.id });
+                    newConns.push({ id: nanoid(), fromNodeId: assetId, toNodeId: segVideoNode.id });
                 }
+                newConns.push({ id: nanoid(), fromNodeId: segRefImgNode.id, toNodeId: segVideoNode.id });
+                newConns.push({ id: nanoid(), fromNodeId: segTextNode.id, toNodeId: segVideoNode.id });
                 if (prevVideoId) {
                     newConns.push({ id: nanoid(), fromNodeId: prevVideoId, toNodeId: segVideoNode.id });
                 }

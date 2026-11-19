@@ -33,6 +33,10 @@ export type DirectorSegmentItem = {
     enPrompt?: string;
     negativePrompt?: string;
     firstFramePrompt?: string;
+    firstFrameEnPrompt?: string;
+    lastFramePrompt?: string;
+    lastFrameEnPrompt?: string;
+    assetRefs?: string[];
 };
 
 export type DirectorAssetCard = {
@@ -345,45 +349,70 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
         }
     }
 
-    // Also extract distinct props/scenes from each segment's 【主体与空间层次】/【主体与道具】/【光色与材质】 if needed
-    segments.forEach((seg, idx) => {
-        const subjectMatch = seg.prompt.match(/【主体与(?:空间层次|道具)】([^\n【]+)/);
-        const lightMatch = seg.prompt.match(/【光色与材质】([^\n【]+)/);
-        const subjectText = subjectMatch ? subjectMatch[1].trim() : "";
-        const lightText = lightMatch ? lightMatch[1].trim() : "";
-
-        if (scenes.length <= idx && (subjectText || lightText)) {
-            const sceneName = `${seg.id} 场景`;
-            if (!seenNames.has(sceneName)) {
-                seenNames.add(sceneName);
-                scenes.push({
-                    name: sceneName,
-                    prompt: `【场景设定卡 · ${sceneName}】空镜场景设定图：16:9 横屏，${subjectText}；${lightText}；超写实电影质感，无人物无文字`,
-                });
+    // Also extract shared characters/scenes/props from script overview if still missing
+    if (characters.length === 0) {
+        const charLine = clean.match(/(?:主角|人物|角色)[：:]\s*([^\n]+)/);
+        if (charLine?.[1]) {
+            const parts = charLine[1].split(/[、，,]/).map((s) => s.trim()).filter((s) => s && s.length <= 24);
+            for (const part of parts.slice(0, 4)) {
+                const name = part.replace(/^(?:优势格斗者|弱势者|主角|角色)\s*/, "").split(/[\s（(]/)[0].trim();
+                if (name && !seenNames.has(name)) {
+                    seenNames.add(name);
+                    characters.push({
+                        name,
+                        prompt: formatBilingualNodePrompt(
+                            `角色三视图与常用表情设定图（${name}）：纯白干净背景，左侧为正面、侧面、背面全身三视图，右侧为喜/怒/惊/痛等常用表情头像矩阵，同一张图内完整展示，五官发型服装材质前后严格一致，超写实细节，无文字无水印。`,
+                            `Character turnaround sheet & common expressions (${name}) on clean pure white background: full-body three-view turnaround (front, side, back) alongside a grid of common facial expressions (neutral, angry, shocked, pain) in one unified sheet, consistent facial features, hair and outfit, photorealistic, no text, no watermark.`,
+                        ),
+                    });
+                }
             }
         }
-        const propExtract = seg.prompt.match(/核心道具(?:意象)?(?:即|为|是)?([^。；;\n]+)/);
+    }
+
+    if (scenes.length === 0) {
+        const sceneLine = clean.match(/(?:场景|地点|环境)[：:]\s*([^\n]+)/);
+        const sceneDesc = sceneLine?.[1]?.trim() || segments[0]?.prompt.match(/【(?:本段概览|主体与空间层次)】([^\n【]+)/)?.[1]?.trim() || "核心主场景";
+        scenes.push({
+            name: "核心主场景",
+            prompt: formatBilingualNodePrompt(
+                `空镜场景设定图：16:9 横屏画幅，${sceneDesc}，超写实电影级光影与空间层次，无人物无文字无水印。`,
+                `Empty scene concept art, 16:9 widescreen, ${sceneDesc}, photorealistic cinematic lighting and spatial depth, no people, no text, no watermark.`,
+            ),
+        });
+    }
+
+    if (props.length === 0) {
+        const propExtract = clean.match(/(?:道具|关键道具|核心道具)[：:]\s*([^\n]+)/);
         if (propExtract?.[1]) {
-            const propDesc = propExtract[1].trim();
-            const propName = propDesc.split(/[与、，,]/)[0].trim().slice(0, 14) || `${seg.id} 关键道具`;
-            if (!seenNames.has(propName)) {
+            const propName = propExtract[1].split(/[、，,。；;]/)[0].trim().slice(0, 16);
+            if (propName && !seenNames.has(propName)) {
                 seenNames.add(propName);
                 props.push({
                     name: propName,
-                    prompt: `【道具设定卡 · ${propName}】关键道具设定特写：${propDesc}，写实材质肌理与光影细节，无人物无文字`,
+                    prompt: formatBilingualNodePrompt(
+                        `关键道具三视图设定图（${propName}）：纯白干净背景，正面/侧面/俯视三视图同框，超写实材质纹理与几何结构，无人物无文字无水印。`,
+                        `Key prop three-view turnaround sheet (${propName}) on clean pure white background: front, side, and top views in one unified sheet, photorealistic material texture and structure, no people, no text, no watermark.`,
+                    ),
                 });
             }
         }
-    });
-
-    if (scenes.length === 0 && characters.length === 0 && props.length === 0) {
-        segments.forEach((seg) => {
-            scenes.push({
-                name: `${seg.id} 场景`,
-                prompt: `【场景设定卡 · ${seg.id}】空镜场景设定图，超写实电影级光影与材质细节：${seg.prompt.slice(0, 260)}`,
-            });
-        });
     }
+
+    const allAssetNames = [...characters, ...scenes, ...props].map((a) => a.name);
+    segments.forEach((seg) => {
+        if (!seg.assetRefs?.length) {
+            const matched = allAssetNames.filter((n) => seg.prompt.includes(n));
+            seg.assetRefs = matched.length ? matched : allAssetNames;
+        }
+        if (!seg.firstFramePrompt) {
+            const overview = seg.prompt.match(/【(?:本段概览|Subject and Space|Segment Overview)】([^\n【]+)/)?.[1]?.trim() || seg.prompt.slice(0, 180);
+            seg.firstFramePrompt = formatBilingualNodePrompt(
+                `【${seg.id} 分镜首帧参考图】严格参考已连入的人物三视图、场景空镜与道具设定，保持角色外貌服装与环境光影完全一致。画面内容：${overview}`,
+                `[${seg.id} Keyframe Reference] Strictly follow the connected character turnaround, scene, and prop references for consistent appearance, outfit, and lighting. Composition: ${overview}`,
+            );
+        }
+    });
 
     // Extract global or per-segment negative prompt
     const globalNegativePrompt = extractNegativePromptFromText(clean) || extractNegativePromptFromText(zhOnlyText);
@@ -479,6 +508,10 @@ export function parseDirectorWorkflowJson(text: string): DirectorStructuredWorkf
                                       enPrompt: x.enPrompt ? String(x.enPrompt) : undefined,
                                       negativePrompt: x.negativePrompt ? String(x.negativePrompt) : fallbackNeg,
                                       firstFramePrompt: x.firstFramePrompt ? String(x.firstFramePrompt) : undefined,
+                                      firstFrameEnPrompt: x.firstFrameEnPrompt ? String(x.firstFrameEnPrompt) : undefined,
+                                      lastFramePrompt: x.lastFramePrompt ? String(x.lastFramePrompt) : undefined,
+                                      lastFrameEnPrompt: x.lastFrameEnPrompt ? String(x.lastFrameEnPrompt) : undefined,
+                                      assetRefs: Array.isArray(x.assetRefs) ? x.assetRefs.map((r) => String(r).trim()).filter(Boolean) : undefined,
                                   }))
                             : [],
                     };
@@ -497,16 +530,17 @@ export function parseDirectorWorkflowJson(text: string): DirectorStructuredWorkf
 
 export function buildWorkflowExtractPrompt(scriptText: string, aspectRatio: "16:9" | "9:16", durationSec: number): string {
     const durHint = durationSec > 0 ? `总时长约 ${durationSec} 秒` : "按脚本实际段落拆分";
-    return `请将下面的导演脚本/分镜提示词，严格拆分为一个可直接用于无限画布节点生成的单行转义 JSON 对象。
+    return `请将下面的导演脚本/分镜提示词，严格按【先资产拆解 → 再分镜与参考图/首尾帧拆解】的影视工作流，拆分为一个可直接用于无限画布节点生成的单行转义 JSON 对象。
 必须放在 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 之间，不要使用 markdown 代码块，JSON 字符串内部换行一律用 \\n 转义！
 
 ===WORKFLOW_JSON_START===
-{"negativePrompt":"全局负面提示词（英文优先，如：no people, no text, no watermark, no distortion）","characters":[{"name":"角色名","prompt":"角色全身三视图中文注解（正面/侧面/背面、五官发型服装材质）","enPrompt":"Full-body three-view character turnaround sheet (front, side, back) on pure white background, detailed facial features, hair, outfit material and colors, consistent design, photorealistic, no text"}],"scenes":[{"name":"场景名","prompt":"空镜场景设定图中文注解（${aspectRatio}画幅，空间结构、光线色温、无人物）","enPrompt":"Empty scene concept art, ${aspectRatio} widescreen, spatial layout, lighting and color temperature, photorealistic cinematic texture, no people, no text"}],"props":[{"name":"道具名","prompt":"关键道具中文注解（纯白背景、材质纹理结构）","enPrompt":"Key prop design close-up on clean white background, detailed material texture and geometry, photorealistic, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"prompt":"S01完整中文视频提示词","enPrompt":"S01 complete English video prompt","negativePrompt":"S01 negative prompt"}]}
+{"negativePrompt":"全局负面提示词（英文优先，如：no text, no watermark, no distortion）","characters":[{"name":"角色名","prompt":"角色全身三视图+常用表情矩阵中文注解（同一张图包含正面/侧面/背面全身三视图与喜怒惊痛等常用表情头像，纯白背景，外貌服装细节）","enPrompt":"Character sheet on pure white background: full-body three-view turnaround (front, side, back) and common facial expressions grid (neutral, angry, shocked, pain) all in one unified sheet, consistent face, hair, outfit and material, photorealistic, no text"}],"scenes":[{"name":"核心场景名","prompt":"空镜场景设定图中文注解（${aspectRatio}画幅，空间结构、光线色温、无人物）","enPrompt":"Empty scene concept art, ${aspectRatio} widescreen, spatial layout, lighting and color temperature, photorealistic cinematic texture, no people, no text"}],"props":[{"name":"道具名","prompt":"关键道具三视图中文注解（同一张图包含正面/侧面/俯视三视图，纯白背景，材质纹理结构）","enPrompt":"Key prop three-view turnaround sheet (front, side, top) on clean white background, detailed material texture and geometry, photorealistic, no people, no text"}],"segments":[{"id":"S01","title":"第1段简述","duration":10,"assetRefs":["角色名","核心场景名","道具名"],"firstFramePrompt":"S01分镜参考图/首帧中文注解（结合所需资产描述该镜头构图、景别、站位与光影）","firstFrameEnPrompt":"S01 keyframe reference image English prompt combining character/scene/prop layout, framing and lighting, photorealistic","prompt":"S01完整中文视频动态提示词","enPrompt":"S01 complete English video motion prompt","negativePrompt":"S01 negative prompt"}]}
 ===WORKFLOW_JSON_END===
 
 硬性规则：
-1. 仔细从脚本中提取所有出现或隐含的【角色】【场景】【关键道具（如门洞、落叶、商品、器物等）】；即使原脚本无人物，也必须拆出对应的 scenes（场景设定卡）和 props（关键意象/道具设定卡）！
-2. segments 必须按 Muse 单段 ≤10 秒上限拆分（${durHint}），每段必须同时提供完整的中文 prompt 与英文 enPrompt！
+1. 【全局共享资产先拆】：从剧本中提取所有独立【角色】【核心物理场景】【关键道具】，全局共享复用——严禁把 S01..S06 分镜本身拆成 6 张假场景卡！
+2. 【人物卡要求】：每个人物必须要求「全身三视图（正/侧/背）+ 常用表情矩阵」全部画在同一张纯白背景图里；【道具卡要求】：每个关键道具必须要求「三视图」画在同一张纯白背景图里；所有资产均需同时提供中文 prompt 与英文 enPrompt。
+3. 【分镜资产绑定与参考图】：segments 必须按 Muse 单段 ≤10 秒上限拆分（${durHint}）；每个分镜必须通过 assetRefs 列出该分镜实际用到的资产 name，并同时提供用于生成分镜参考图/首帧图的 firstFramePrompt + firstFrameEnPrompt，以及用于生成视频的 prompt + enPrompt！
 
 待拆分的导演脚本如下：
 ${scriptText}`;

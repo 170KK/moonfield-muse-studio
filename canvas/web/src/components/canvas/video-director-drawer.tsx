@@ -323,7 +323,15 @@ export function VideoDirectorDrawer({
                         : nodePromptLang === "zh"
                           ? zh
                           : formatBilingualNodePrompt(zh, en);
-                return { ...seg, prompt: finalPrompt };
+                const ffZh = seg.firstFramePrompt || "";
+                const ffEn = seg.firstFrameEnPrompt || "";
+                const finalFirstFramePrompt =
+                    nodePromptLang === "en"
+                        ? ffEn || ffZh
+                        : nodePromptLang === "zh"
+                          ? ffZh
+                          : formatBilingualNodePrompt(ffZh, ffEn);
+                return { ...seg, prompt: finalPrompt, ...(finalFirstFramePrompt ? { firstFramePrompt: finalFirstFramePrompt } : {}) };
             }),
         };
     };
