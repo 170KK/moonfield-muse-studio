@@ -383,18 +383,26 @@ export function VideoDirectorDrawer({
         if (streaming) stopGenerating();
         setExtractingId(msgId);
         try {
-            let workflow = getResolvedWorkflow(msgId, scriptText);
+            const explicitJsonWorkflow = workflowEdits[msgId] || parseDirectorWorkflowJson(scriptText);
+            let workflow = explicitJsonWorkflow;
 
             if (!workflow || !workflow.segments.length) {
                 const fullContext = messages
                     .map((m) => `${m.role === "user" ? "【用户脚本/要求】" : "【导演方案】"}\n${dedupeStreamText(m.content)}`)
                     .join("\n\n");
                 const extractPrompt = buildWorkflowExtractPrompt(fullContext || scriptText, aspectRatio, durationSec);
-                const rawJson = await callTextCompletion(
-                    "你是专业分镜结构化助手，只输出 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 包裹的单行合法 JSON 对象。",
-                    [{ role: "user", content: extractPrompt }],
-                );
-                workflow = parseDirectorWorkflowJson(rawJson) || fallbackParseWorkflowFromText(rawJson);
+                try {
+                    const rawJson = await callTextCompletion(
+                        "你是专业分镜结构化助手，只输出 ===WORKFLOW_JSON_START=== 和 ===WORKFLOW_JSON_END=== 包裹的单行合法 JSON 对象。",
+                        [{ role: "user", content: extractPrompt }],
+                    );
+                    workflow = parseDirectorWorkflowJson(rawJson);
+                } catch {
+                    workflow = null;
+                }
+                if (!workflow || !workflow.segments.length) {
+                    workflow = getResolvedWorkflow(msgId, scriptText);
+                }
             }
 
             if (!workflow || !workflow.segments.length) {
