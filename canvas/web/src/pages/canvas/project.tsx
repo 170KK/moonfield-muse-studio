@@ -722,7 +722,7 @@ function InfiniteCanvasPage() {
                     quality: effectiveConfig.quality && effectiveConfig.quality !== "auto" ? effectiveConfig.quality : "high",
                     count: imageCount,
                     prompt: item.aiPrompt,
-                    negativePrompt: sharedNegativePrompt,
+                    negativePrompt: item.kind === "人物资产" ? [sharedNegativePrompt, "no weapons, no swords, no scabbards, no handheld props"].filter(Boolean).join(", ") : sharedNegativePrompt,
                     remark: item.kind,
                 });
                 imgNode.title = item.label;
