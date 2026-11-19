@@ -402,6 +402,25 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
                 }
             }
         }
+        if (characters.length === 0) {
+            const outfitMatches = Array.from(
+                clean.matchAll(/(?:^|[，,、。\s；;])([阿小老]?[\u4e00-\u9fa5]{1,2})(?:身穿|身着|穿着|穿|披着|戴着|(?=(?:白|黑|灰|红|蓝|青|绿|黄|紫|粉|米|棕|深|浅)[\u4e00-\u9fa5]{1,6}(?:T恤|长袍|衬衫|裙|连衣裙|短裤|长裤|外套|卫衣|西装|汉服)))([^\n，,。；;]{2,26})/g),
+            );
+            for (const m of outfitMatches) {
+                const name = (m[1] || "").trim();
+                const outfit = (m[2] || "").trim();
+                if (!name || /^(?:两人|二人|他们|她们|男女|主角|人物|角色|画面|全身|半身|全程|只有)$/.test(name) || seenNames.has(name)) continue;
+                seenNames.add(name);
+                characters.push({
+                    name,
+                    prompt: formatBilingualNodePrompt(
+                        `真人实拍正面定妆照（${name}）：${name}，${outfit}；空手自然站立无武器道具，干净浅灰背景，自然柔和光，真实皮肤纹理与自然颗粒，85mm人像镜头，无文字无水印。`,
+                        `Live-action portrait photograph, front-facing casting photo of ${name} (${outfit}); empty-handed standing pose with no weapons or props, clean light-gray studio background, soft natural lighting, natural skin texture, 85mm lens, no text, no watermark.`,
+                    ),
+                });
+                if (characters.length >= 4) break;
+            }
+        }
     }
 
     if (scenes.length === 0) {
@@ -449,10 +468,26 @@ export function fallbackParseWorkflowFromText(text: string): DirectorStructuredW
                     props.push({
                         name: propName,
                         prompt: formatBilingualNodePrompt(
-                            `关键道具三视图设定图（${propName}）：纯白干净背景，正面/侧面/俯视三视图同框，超写实材质纹理与几何结构，无人物无文字无水印。`,
-                            `Key prop three-view turnaround sheet (${propName}) on clean pure white background: front, side, and top views in one unified sheet, photorealistic material texture and structure, no people, no text, no watermark.`,
+                            `实拍道具特写照片（${propName}）：干净浅色背景，自然光，真实材质质感，无人物无文字无水印。`,
+                            `Live-action close-up photograph of prop (${propName}): clean light background, natural lighting, realistic material texture, no people, no text, no watermark.`,
                         ),
                     });
+                }
+            }
+        }
+        if (props.length === 0) {
+            const commonProps = ["自行车", "单车", "长剑", "飞剑", "佩剑", "青冥剑", "玄岳剑", "听风剑", "手机", "酒瓶", "啤酒瓶", "雨伞", "吉他", "相机", "咖啡杯", "书本"];
+            for (const propName of commonProps) {
+                if (clean.includes(propName) && !seenNames.has(propName)) {
+                    seenNames.add(propName);
+                    props.push({
+                        name: propName,
+                        prompt: formatBilingualNodePrompt(
+                            `实拍道具特写照片（${propName}）：干净浅色背景，自然光，真实材质质感，无人物无文字无水印。`,
+                            `Live-action close-up photograph of prop (${propName}): clean light background, natural lighting, realistic material texture, no people, no text, no watermark.`,
+                        ),
+                    });
+                    if (props.length >= 3) break;
                 }
             }
         }
