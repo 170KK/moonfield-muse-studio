@@ -140,7 +140,7 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
 
 /** 从用户提示词中提取明确指定的参数（画幅比例、清晰度、秒数、帧率、音频），覆盖默认配置。 */
 export function applyPromptParameters(config: AiConfig, prompt: string, mode: CanvasNodeGenerationMode): AiConfig {
-    if (mode !== "video" || !prompt.trim()) return config;
+    if ((mode !== "video" && mode !== "image") || !prompt.trim()) return config;
     const next = { ...config };
 
     const ratioMatch = prompt.match(/\b(16:9|9:16|1:1|3:4|4:3|21:9)\b/);
@@ -152,18 +152,22 @@ export function applyPromptParameters(config: AiConfig, prompt: string, mode: Ca
         next.size = "16:9";
     }
 
-    const qualityMatch = prompt.match(/\b(480|720|1080)p\b/i);
+    if (mode !== "video") return next;
+
+    const qualityMatch = prompt.match(/\b(480|720|1080)\s*p\b/i);
     if (qualityMatch) {
         next.vquality = `${qualityMatch[1]}p`;
     }
 
-    const secMatch = prompt.match(/(\d{1,2})\s*(?:秒|s|sec|seconds)\b/i);
+    const explicitSecMatch = prompt.match(/(?:时长(?:严格)?(?:为|约|是)?\s*|duration\s*[:=]?\s*)(\d{1,2})\s*(?:秒|(?:s|sec|seconds)\b)/i);
+    const standaloneSecMatch = prompt.match(/(?<![-\d])(\d{1,2})\s*(?:秒|(?:s|sec|seconds)\b)/i);
+    const secMatch = explicitSecMatch || standaloneSecMatch;
     if (secMatch) {
         const sec = Number(secMatch[1]);
         if (sec >= 4 && sec <= 15) next.videoSeconds = String(sec);
     }
 
-    const fpsMatch = prompt.match(/\b(30|48|60)\s*(?:fps|帧)\b/i);
+    const fpsMatch = prompt.match(/\b(30|48|60)\s*(?:fps\b|帧)/i);
     if (fpsMatch) {
         next.videoFps = fpsMatch[1];
     }

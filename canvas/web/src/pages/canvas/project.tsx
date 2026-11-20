@@ -3531,13 +3531,14 @@ function InfiniteCanvasPage() {
                     return;
                 }
                 if (node.type === CanvasNodeType.Video) {
-                    await completeVideoNodeTask(node.id, generationConfig, prompt, retryImages, controller.signal, {
-                        size: generationConfig.size,
-                        seconds: generationConfig.videoSeconds,
-                        vquality: generationConfig.vquality,
-                        generateAudio: generationConfig.videoGenerateAudio,
-                        watermark: generationConfig.videoWatermark,
-                        videoMode: generationConfig.videoMode,
+                    await completeVideoNodeTask(node.id, resolvedRetryConfig, prompt, retryImages, controller.signal, {
+                        size: resolvedRetryConfig.size,
+                        seconds: resolvedRetryConfig.videoSeconds,
+                        vquality: resolvedRetryConfig.vquality,
+                        fps: resolvedRetryConfig.videoFps,
+                        generateAudio: resolvedRetryConfig.videoGenerateAudio,
+                        watermark: resolvedRetryConfig.videoWatermark,
+                        videoMode: resolvedRetryConfig.videoMode,
                     }, context?.referenceVideos || [], context?.referenceAudios || []);
                     return;
                 }
