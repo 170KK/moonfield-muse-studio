@@ -48,8 +48,8 @@ function Ensure-PythonVenv {
     if (-not $sysPython) {
         $winget = Get-Command winget -ErrorAction SilentlyContinue
         if ($winget) {
-            Write-Output "[1/4] 未检测到 Python，正在通过 winget 自动安装 Python 3.11..."
-            & winget install -e --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
+            Write-Host "[1/4] 未检测到 Python，正在通过 winget 自动安装 Python 3.11..."
+            & winget install -e --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements | Out-Host
             $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
             $found = Get-Command python -ErrorAction SilentlyContinue
             if ($found) { $sysPython = $found.Source }
@@ -59,10 +59,10 @@ function Ensure-PythonVenv {
         throw "未找到 Python 3.10+，请先安装 Python (https://www.python.org/downloads/) 并勾选 Add to PATH 后重试。"
     }
 
-    Write-Output "[1/4] 首次启动：正在创建 Python 虚拟环境并安装号池依赖..."
-    & $sysPython -m venv (Join-Path $root ".venv")
-    & $venvPython -m pip install --upgrade pip -q
-    & $venvPython -m pip install -r (Join-Path $root "pool\requirements.txt")
+    Write-Host "[1/4] 首次启动：正在创建 Python 虚拟环境并安装号池依赖..."
+    & $sysPython -m venv (Join-Path $root ".venv") | Out-Host
+    & $venvPython -m pip install --upgrade pip -q | Out-Host
+    & $venvPython -m pip install -r (Join-Path $root "pool\requirements.txt") | Out-Host
     return $venvPython
 }
 
@@ -71,8 +71,8 @@ function Ensure-NodeExe {
     if ($found) { return $found.Source }
     $winget = Get-Command winget -ErrorAction SilentlyContinue
     if ($winget) {
-        Write-Output "[2/4] 未检测到 Node.js，正在通过 winget 自动安装 Node.js LTS..."
-        & winget install -e --id OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
+        Write-Host "[2/4] 未检测到 Node.js，正在通过 winget 自动安装 Node.js LTS..."
+        & winget install -e --id OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements | Out-Host
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
         $found = Get-Command node -ErrorAction SilentlyContinue
         if ($found) { return $found.Source }
@@ -100,7 +100,7 @@ function Ensure-PoolEnv {
         "MUSE2API_CDP_PORT=19220",
         "MUSE2API_PROFILE_ROOT=$profileDir",
         "MUSE2API_IMAGE_TIMEOUT=240",
-        "MUSE2API_VIDEO_TIMEOUT=600",
+        "MUSE2API_VIDEO_TIMEOUT=1800",
         "MUSE2API_CHAT_TIMEOUT=300",
         "MUSE2API_CONCURRENCY=2",
         "MUSE2API_KEEPALIVE_DISABLED_ACCOUNTS=0",
@@ -108,12 +108,12 @@ function Ensure-PoolEnv {
         "MUSE2API_REF_IMAGE_PRIVATE_FETCH=0"
     )
     Set-Content -Path $poolEnvPath -Value ($lines -join "`n") -Encoding UTF8
-    Write-Output "[3/4] 已自动生成本机号池配置 pool\.env"
+    Write-Host "[3/4] 已自动生成本机号池配置 pool\.env"
     return $apiKey
 }
 
-$pythonExe = Ensure-PythonVenv
-$nodeExe = Ensure-NodeExe
+$pythonExe = [string](Ensure-PythonVenv | Select-Object -Last 1)
+$nodeExe = [string](Ensure-NodeExe | Select-Object -Last 1)
 $npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
 if (-not $npmCmd) { $npmCmd = "npm" }
 
