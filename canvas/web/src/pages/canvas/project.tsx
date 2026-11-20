@@ -3285,7 +3285,7 @@ function InfiniteCanvasPage() {
                                                   }
                                                 : img,
                                         );
-                                        const makePrimary = firstSuccessId === imageId;
+                                        const makePrimary = !item.metadata?.content && firstSuccessId === imageId;
                                         return {
                                             ...item,
                                             metadata: {
@@ -3432,15 +3432,16 @@ function InfiniteCanvasPage() {
                                   }
                                 : v,
                         );
+                        const shouldPromote = !item.metadata?.content;
                         return {
                             ...item,
                             metadata: {
                                 ...item.metadata,
-                                ...videoMetadata(video),
+                                ...(shouldPromote ? videoMetadata(video) : { status: NODE_STATUS_SUCCESS }),
                                 prompt,
                                 model: generationConfig.model,
                                 videos,
-                                primaryVideoId: newSlotId,
+                                primaryVideoId: shouldPromote ? newSlotId : item.metadata?.primaryVideoId || videos[0]?.id,
                             },
                         };
                     }),
