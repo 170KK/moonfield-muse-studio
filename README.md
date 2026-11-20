@@ -63,3 +63,15 @@ git clone https://github.com/170KK/moonfield-muse-studio.git; cd moonfield-muse-
 ## 隐私与安全说明
 
 - 所有个人账号 Cookie、Chrome 隔离配置（`data/browser-profiles/`）、号池随机密钥（`pool/.env`）与 Agent 密钥（`data/agent/canvas-agent.json`）均**仅保存在你的本地电脑**，并已列入 `.gitignore`，不会包含在开源代码中。
+
+---
+
+## 致谢与第三方组件
+
+本项目基于以下项目构建，版权归各自作者所有：
+
+- **无限画布（`canvas/`）**：基于 infinite-canvas 项目，MIT 许可证，授权文本见 `LICENSES/infinite-canvas-MIT.txt`。
+- **号池引擎（`pool/`）**：基于 muse2api 项目，MIT 许可证，授权文本见 `LICENSES/muse2api-MIT.txt`。
+- **视频导演技能（`skills/muse-video-prompt/`）**：来自 [dichenxiang/muse-video-prompt](https://github.com/dichenxiang/muse-video-prompt)（抖音作者 deverel 丨ai美学丶skill）。原仓库未附开源许可证，版权归原作者所有；本仓库仅为方便一键安装而内置并标注出处，详见该目录下的 `SOURCE.md`，如需再分发请先取得原作者许可。
+
+除上述第三方组件外，本项目其余代码以根目录 `LICENSE`（MIT）授权。
