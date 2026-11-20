@@ -65,9 +65,12 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
         else onPromptChange(node.id, value);
     };
 
+    const hasReferenceContext = connectedNodes.length > 0 || mentionReferences.length > 0;
+    const canSubmit = Boolean(prompt.trim()) || hasReferenceContext;
+
     const submit = () => {
         const text = prompt.trim();
-        if (!text || isRunning) return;
+        if (!canSubmit || isRunning) return;
         onGenerate(node.id, mode, text);
     };
 
@@ -93,10 +96,10 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                         <Button
                             size="small"
                             type="default"
-                            disabled={isRunning || !prompt.trim()}
+                            disabled={isRunning || !canSubmit}
                             onClick={() => {
                                 const text = prompt.trim();
-                                if (text && !isRunning) onRegenerateInPlace(node.id, mode, text);
+                                if (canSubmit && !isRunning) onRegenerateInPlace(node.id, mode, text);
                             }}
                             icon={<RefreshCw className={`size-3.5 ${isRunning ? "animate-spin" : ""}`} />}
                             className="mt-5 shrink-0 !rounded-full !px-3 !text-xs font-medium"
@@ -189,7 +192,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                     type="primary"
                     className="!h-10 !min-w-16 shrink-0 !rounded-full !px-3"
                     danger={isRunning}
-                    disabled={!isRunning && !prompt.trim()}
+                    disabled={!isRunning && !canSubmit}
                     onClick={() => (isRunning ? onStop(node.id) : submit())}
                     aria-label={t(isRunning ? "canvas.promptPanel.stopGeneration" : "canvas.promptPanel.generate")}
                 >

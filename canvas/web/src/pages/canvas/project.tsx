@@ -2728,7 +2728,17 @@ function InfiniteCanvasPage() {
                 buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, editingTextNode ? t("canvas.projectPage.editTextPrompt", { source: sourceTextContent, prompt }) : prompt),
             );
             const rawNeg = (sourceNode?.metadata?.negativePrompt || "").trim();
-            const basePrompt = extractAiPromptForGeneration(generationContext.prompt.trim());
+            let basePrompt = extractAiPromptForGeneration(generationContext.prompt.trim());
+            if (!basePrompt && (generationContext.referenceImages.length > 0 || generationContext.referenceVideos.length > 0 || generationContext.textCount > 0)) {
+                basePrompt =
+                    mode === "image"
+                        ? "请基于已提供的参考图片或视频画面，延续其中的主体人物外貌、服装、场景氛围与光影质感，生成自然、符合意境与逻辑的写实画面。"
+                        : mode === "video"
+                          ? "请基于已提供的参考图片或视频画面，延续其中的主体人物外貌、服装、场景、光线与整体意境，生成动作自然流畅、符合画面逻辑的写实动态视频。"
+                          : mode === "audio"
+                            ? "请根据已提供的参考内容意境与氛围，生成匹配的配音或音效。"
+                            : "请分析并总结已提供的参考内容，给出符合其意境与逻辑的详细描述与创作建议。";
+            }
             const effectivePrompt = rawNeg
                 ? `${basePrompt}\n\n[Negative / Avoid]: ${extractAiPromptForGeneration(rawNeg)}`
                 : basePrompt;
@@ -2769,7 +2779,27 @@ function InfiniteCanvasPage() {
                         isImageNode && sourceNode?.metadata?.content && !overwriteExisting
                             ? [{ id: sourceNode.id, name: `${sourceNode.title || sourceNode.id}.png`, type: sourceNode.metadata.mimeType || "image/png", dataUrl: sourceNode.metadata.content, storageKey: sourceNode.metadata.storageKey }]
                             : [];
-                    const referenceImages = [...new Map([...sourceReference, ...generationContext.referenceImages].map((image) => [image.id, image])).values()];
+                    let videoDerivedRefs: typeof generationContext.referenceImages = [];
+                    if (!generationContext.referenceImages.length && generationContext.referenceVideos.length > 0) {
+                        const firstVidUrl = generationContext.referenceVideos[0]?.dataUrl;
+                        if (firstVidUrl) {
+                            try {
+                                const frameBlob = await captureVideoFrame(firstVidUrl, "last", 0);
+                                const frameDataUrl = await new Promise<string>((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(String(reader.result || ""));
+                                    reader.onerror = () => reject(new Error("读取参考视频画面失败"));
+                                    reader.readAsDataURL(frameBlob);
+                                });
+                                if (frameDataUrl) {
+                                    videoDerivedRefs = [{ id: `vid-ref-${Date.now()}`, name: "video-ref-frame.png", type: "image/png", dataUrl: frameDataUrl }];
+                                }
+                            } catch {
+                                // ignore if video frame cannot be captured
+                            }
+                        }
+                    }
+                    const referenceImages = [...new Map([...sourceReference, ...generationContext.referenceImages, ...videoDerivedRefs].map((image) => [image.id, image])).values()];
                     const generationType = referenceImages.length ? ("edit" as const) : ("generation" as const);
                     const generationMetadata = buildImageGenerationMetadata(generationType, generationConfig, count, referenceImages);
                     const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];
