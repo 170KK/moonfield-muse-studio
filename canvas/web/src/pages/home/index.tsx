@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpRight, CheckCircle2, Cpu, Database, Film, FolderTree, Image as ImageIcon, Layers, Sparkles, Video, Wand2, Zap } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, Cpu, Database, Film, FolderTree, Image as ImageIcon, Layers, ShoppingBag, Sparkles, Video, Wand2, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -67,12 +67,12 @@ export default function IndexPage() {
                             : "从剧本拆词、2K 原画设定卡到 S01→S02 尾帧无缝视频接力，由多账号独立标签页并发号池驱动的一体化影视创作台。"}
                     </p>
 
-                    {/* 两个大号高质感核心主按钮 */}
-                    <div className="mt-9 flex flex-wrap items-center justify-center gap-4 sm:gap-5">
+                    {/* 上层：进入无限画布；下层：先加账号（月域号池） + Muse账号购买 */}
+                    <div className="mt-9 flex flex-col items-center gap-3.5">
                         <button
                             type="button"
                             onClick={() => navigate("/canvas")}
-                            className="group relative inline-flex h-15 cursor-pointer items-center justify-center gap-3.5 overflow-hidden rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-9 text-base font-semibold text-white shadow-[0_1px_0_0_rgba(255,255,255,0.32)_inset,0_16px_36px_-8px_rgba(79,70,229,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-violet-600 hover:shadow-[0_1px_0_0_rgba(255,255,255,0.4)_inset,0_20px_44px_-8px_rgba(79,70,229,0.7)] active:translate-y-0"
+                            className="group relative inline-flex h-15 cursor-pointer items-center justify-center gap-3.5 overflow-hidden rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-10 text-base font-semibold text-white shadow-[0_1px_0_0_rgba(255,255,255,0.32)_inset,0_16px_36px_-8px_rgba(79,70,229,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:from-indigo-500 hover:to-violet-600 hover:shadow-[0_1px_0_0_rgba(255,255,255,0.4)_inset,0_20px_44px_-8px_rgba(79,70,229,0.7)] active:translate-y-0"
                         >
                             <span className="flex size-8 items-center justify-center rounded-xl bg-white/15 backdrop-blur-xs">
                                 <Layers className="size-4.5" />
@@ -81,19 +81,34 @@ export default function IndexPage() {
                             <ArrowRight className="size-4.5 transition-transform duration-200 group-hover:translate-x-1" />
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={() => navigate("/pool")}
-                            className="group relative inline-flex h-15 cursor-pointer items-center justify-center gap-3.5 rounded-2xl border border-stone-300/90 bg-white/90 px-9 text-base font-semibold text-stone-900 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_12px_28px_-10px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/60 hover:shadow-[0_16px_36px_-10px_rgba(16,185,129,0.22)] active:translate-y-0 dark:border-white/14 dark:bg-[#11131a]/90 dark:text-white dark:shadow-[0_1px_0_0_rgba(255,255,255,0.08)_inset,0_16px_36px_-12px_rgba(0,0,0,0.7)] dark:hover:border-emerald-400/50"
-                        >
-                            <span className="flex size-8 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
-                                <Database className="size-4.5" />
-                            </span>
-                            <span className="tracking-tight">{isEn ? "Account Pool Console" : "先加账号（月域号池）"}</span>
-                            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-300">
-                                {isEn ? "N×5 Parallel" : "支持并发"}
-                            </span>
-                        </button>
+                        <div className="flex flex-wrap items-center justify-center gap-3.5">
+                            <button
+                                type="button"
+                                onClick={() => navigate("/pool")}
+                                className="group relative inline-flex h-13 cursor-pointer items-center justify-center gap-3 rounded-2xl border border-stone-300/90 bg-white/90 px-7 text-sm font-semibold text-stone-900 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_12px_28px_-10px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/60 hover:shadow-[0_16px_36px_-10px_rgba(16,185,129,0.22)] active:translate-y-0 dark:border-white/14 dark:bg-[#11131a]/90 dark:text-white dark:shadow-[0_1px_0_0_rgba(255,255,255,0.08)_inset,0_16px_36px_-12px_rgba(0,0,0,0.7)] dark:hover:border-emerald-400/50"
+                            >
+                                <span className="flex size-7 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+                                    <Database className="size-4" />
+                                </span>
+                                <span className="tracking-tight">{isEn ? "Account Pool Console" : "先加账号（月域号池）"}</span>
+                                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-300">
+                                    {isEn ? "N×5 Parallel" : "支持并发"}
+                                </span>
+                            </button>
+
+                            <a
+                                href="https://shiqi01.top/cat/5"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative inline-flex h-13 cursor-pointer items-center justify-center gap-3 rounded-2xl border border-amber-500/35 bg-white/90 px-7 text-sm font-semibold text-stone-900 shadow-[0_1px_0_0_rgba(255,255,255,0.8)_inset,0_12px_28px_-10px_rgba(245,158,11,0.14)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/70 hover:shadow-[0_16px_36px_-10px_rgba(245,158,11,0.25)] active:translate-y-0 dark:border-amber-400/25 dark:bg-[#141310]/90 dark:text-amber-50 dark:shadow-[0_1px_0_0_rgba(255,255,255,0.08)_inset,0_16px_36px_-12px_rgba(0,0,0,0.7)] dark:hover:border-amber-400/55"
+                            >
+                                <span className="flex size-7 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300">
+                                    <ShoppingBag className="size-4" />
+                                </span>
+                                <span className="tracking-tight">{isEn ? "Buy Muse Accounts" : "Muse账号购买"}</span>
+                                <ArrowUpRight className="size-4 text-amber-600 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 dark:text-amber-300" />
+                            </a>
+                        </div>
                     </div>
                 </div>
 
