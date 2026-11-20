@@ -35,7 +35,11 @@ function initClientLifecycleHeartbeat() {
         }
     };
     ping();
-    window.setInterval(ping, 5000);
+    window.setInterval(ping, 15000);
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") ping();
+    });
+    window.addEventListener("pageshow", ping);
     window.addEventListener("pagehide", bye);
     window.addEventListener("beforeunload", bye);
 }
