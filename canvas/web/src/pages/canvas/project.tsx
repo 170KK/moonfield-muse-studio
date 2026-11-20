@@ -391,7 +391,7 @@ function InfiniteCanvasPage() {
                                       ...item.metadata,
                                       status: item.metadata?.content ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR,
                                       errorDetails: item.metadata?.content ? undefined : errorDetails,
-                                      ...(isVideoTaskFailed(error) ? { videoTaskId: undefined } : {}),
+                                      ...(isVideoTaskFailed(error) && !/超时|timeout|未出现新的生成结果/i.test(errorDetails) ? { videoTaskId: undefined } : {}),
                                   },
                               }
                             : item,
@@ -3153,7 +3153,7 @@ function InfiniteCanvasPage() {
                                           ...node.metadata,
                                           status: node.metadata?.content ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR,
                                           errorDetails,
-                                          ...(isVideoTaskFailed(error) && node.type === CanvasNodeType.Video ? { videoTaskId: undefined } : {}),
+                                          ...(isVideoTaskFailed(error) && node.type === CanvasNodeType.Video && !/超时|timeout|未出现新的生成结果/i.test(errorDetails) ? { videoTaskId: undefined } : {}),
                                       },
                                   }
                             : node,
@@ -3609,7 +3609,7 @@ function InfiniteCanvasPage() {
                                       status: item.metadata?.content ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR,
                                       errorDetails: item.metadata?.content ? undefined : errorDetails,
                                       images: item.metadata?.images?.map((image) => (image.id === imageId ? { ...image, status: NODE_STATUS_ERROR, errorDetails } : image)),
-                                      ...(isVideoTaskFailed(error) && item.type === CanvasNodeType.Video ? { videoTaskId: undefined } : {}),
+                                      ...(isVideoTaskFailed(error) && item.type === CanvasNodeType.Video && !/超时|timeout|未出现新的生成结果/i.test(errorDetails) ? { videoTaskId: undefined } : {}),
                                   },
                               }
                             : item,
