@@ -13,10 +13,22 @@ function Resolve-BrowserPath {
         "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
         "$env:LocalAppData\Google\Chrome\Application\chrome.exe",
         "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
-        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+        "$env:LocalAppData\Microsoft\Edge\Application\msedge.exe"
     )
     foreach ($c in $candidates) {
         if ($c -and (Test-Path $c)) { return $c }
+    }
+    foreach ($regPath in @(
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"
+    )) {
+        try {
+            $val = (Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue).'(default)'
+            if ($val -and (Test-Path $val)) { return $val }
+        } catch {}
     }
     return ""
 }

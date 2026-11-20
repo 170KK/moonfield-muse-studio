@@ -37,10 +37,13 @@ def _env(key: str, default: str) -> str:
 
 
 def _detect_chromium() -> str:
-    """优先使用 MUSE2API_CHROMIUM；若未设置或路径不存在，则自动探测系统已安装的 Chromium/Chrome。"""
+    """优先使用 MUSE2API_CHROMIUM；若未设置或路径不存在，则自动探测系统已安装的 Chromium/Chrome/Edge。"""
     configured = os.environ.get("MUSE2API_CHROMIUM", "").strip()
     if configured and (os.path.isfile(configured) or shutil.which(configured)):
         return configured
+    local_app = os.environ.get("LOCALAPPDATA", "").strip()
+    prog_files = os.environ.get("ProgramFiles", r"C:\Program Files").strip()
+    prog_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)").strip()
     candidates = [
         "/usr/bin/chromium",
         "/usr/bin/chromium-browser",
@@ -51,14 +54,32 @@ def _detect_chromium() -> str:
         "chromium-browser",
         "google-chrome",
         "chrome",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        os.path.join(prog_files, "Google", "Chrome", "Application", "chrome.exe"),
+        os.path.join(prog_files_x86, "Google", "Chrome", "Application", "chrome.exe"),
+        os.path.join(local_app, "Google", "Chrome", "Application", "chrome.exe") if local_app else "",
+        os.path.join(prog_files, "Microsoft", "Edge", "Application", "msedge.exe"),
+        os.path.join(prog_files_x86, "Microsoft", "Edge", "Application", "msedge.exe"),
+        os.path.join(local_app, "Microsoft", "Edge", "Application", "msedge.exe") if local_app else "",
+        os.path.join(local_app, "Chromium", "Application", "chrome.exe") if local_app else "",
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     ]
     for c in candidates:
-        if os.path.isfile(c) or shutil.which(c):
+        if c and (os.path.isfile(c) or shutil.which(c)):
             return c
+    if os.name == "nt":
+        try:
+            import winreg
+            for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                for exe_name in ("chrome.exe", "msedge.exe"):
+                    try:
+                        with winreg.OpenKey(root, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{exe_name}") as key:
+                            val, _ = winreg.QueryValueEx(key, "")
+                            if val and os.path.isfile(val):
+                                return val
+                    except OSError:
+                        pass
+        except Exception:
+            pass
     return configured or "chromium"
 
 

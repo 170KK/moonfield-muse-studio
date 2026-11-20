@@ -2122,37 +2122,74 @@ def _close_cdp_browser(port: int):
         pass
 
 
-def _spawn_desktop_chrome(args: list[str]):
-    """通过 Windows Explorer Shell COM 接口在用户可见桌面启动浏览器窗口，彻底杜绝后台会话不弹窗。"""
+def _resolve_visible_browser() -> str:
+    from config import _detect_chromium
+    exe = (CFG.chromium or "").strip()
+    if exe and (os.path.isfile(exe) or shutil.which(exe)):
+        return exe
+    detected = _detect_chromium()
+    if detected and (os.path.isfile(detected) or shutil.which(detected)):
+        CFG.chromium = detected
+        return detected
+    raise HTTPException(400, "未检测到可用的 Chrome 或 Edge 浏览器，请安装 Chrome/Edge 或在 pool/.env 中配置 MUSE2API_CHROMIUM 路径")
+
+
+def _spawn_desktop_chrome(args: list[str], debug_port: int = 0):
+    """在 Windows 桌面上可靠弹出可见浏览器窗口（直接 Popen + SW_SHOWNORMAL 为主，ShellExecute 兜底，并校验 CDP 端口）。"""
     import subprocess
     if os.name == "nt":
+        si = subprocess.STARTUPINFO()
+        si.dwFlags = subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 1  # SW_SHOWNORMAL: force visible even when parent python runs hidden
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | getattr(subprocess, "DETACHED_PROCESS", 0)
         try:
-            exe = args[0]
-            arg_str = subprocess.list2cmdline(args[1:])
+            proc = subprocess.Popen(
+                args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                startupinfo=si,
+                creationflags=creation_flags,
+            )
+            if debug_port:
+                for _ in range(25):
+                    if _is_cdp_port_alive(debug_port):
+                        return proc
+                    if proc.poll() is not None:
+                        break
+                    time.sleep(0.12)
+                if proc.poll() is None:
+                    return proc
+            else:
+                time.sleep(0.3)
+                if proc.poll() is None:
+                    return proc
+        except Exception:
+            pass
+
+        # Fallback: Windows Explorer Shell COM (using single-quoted PS strings to avoid $ expansion)
+        try:
+            exe_ps = args[0].replace("'", "''")
+            arg_ps = subprocess.list2cmdline(args[1:]).replace("'", "''")
             ps_cmd = (
                 "$s = New-Object -ComObject Shell.Application; "
-                f"$s.ShellExecute({json.dumps(exe)}, {json.dumps(arg_str)}, '', 'open', 1)"
+                f"$s.ShellExecute('{exe_ps}', '{arg_ps}', '', 'open', 1)"
             )
-            r = subprocess.run(
+            subprocess.run(
                 ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_cmd],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=6,
             )
-            if r.returncode == 0:
-                return None
+            if debug_port:
+                for _ in range(25):
+                    if _is_cdp_port_alive(debug_port):
+                        return None
+                    time.sleep(0.12)
         except Exception:
             pass
-        si = subprocess.STARTUPINFO()
-        si.dwFlags = subprocess.STARTF_USESHOWWINDOW
-        si.wShowWindow = 1
-        return subprocess.Popen(
-            args,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            startupinfo=si,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-        )
+        if debug_port and not _is_cdp_port_alive(debug_port):
+            raise HTTPException(500, f"浏览器窗口启动失败（{args[0]}），请检查是否被杀毒软件拦截或浏览器路径是否正确")
+        return None
     return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -2254,8 +2291,9 @@ def inspect_account(aid: str, _=Depends(auth)):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         debug_port = s.getsockname()[1]
+    browser_exe = _resolve_visible_browser()
     args = [
-        CFG.chromium,
+        browser_exe,
         f"--user-data-dir={profile_dir}",
         f"--remote-debugging-port={debug_port}",
         "--new-window",
@@ -2266,7 +2304,7 @@ def inspect_account(aid: str, _=Depends(auth)):
     ]
     if acc.get("proxy") and acc["proxy"].get("server"):
         args.insert(-1, f"--proxy-server={acc['proxy']['server']}")
-    proc = _spawn_desktop_chrome(args)
+    proc = _spawn_desktop_chrome(args, debug_port=debug_port)
     _INSPECT_STATE.update({"proc": proc, "port": debug_port, "aid": aid, "profile": profile_dir, "ts": time.time()})
     try:
         import requests as _req
@@ -2721,8 +2759,9 @@ def popup_login_start(payload: dict = Body(default={}), _=Depends(auth)):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         debug_port = s.getsockname()[1]
+    browser_exe = _resolve_visible_browser()
     args = [
-        CFG.chromium,
+        browser_exe,
         f"--user-data-dir={profile_dir}",
         f"--remote-debugging-port={debug_port}",
         "--new-window",
@@ -2734,7 +2773,7 @@ def popup_login_start(payload: dict = Body(default={}), _=Depends(auth)):
     net = _load_net_settings()
     if net.get("global_proxy"):
         args.insert(-1, f"--proxy-server={net['global_proxy']}")
-    proc = _spawn_desktop_chrome(args)
+    proc = _spawn_desktop_chrome(args, debug_port=debug_port)
     _POPUP_LOGIN_STATE.update({"proc": proc, "port": debug_port, "profile": profile_dir, "label": str(payload.get("label") or "").strip(), "done": False, "ts": time.time()})
     return {"ok": True, "port": debug_port}
 
