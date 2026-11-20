@@ -60,6 +60,22 @@ git clone https://github.com/170KK/moonfield-muse-studio.git; cd moonfield-muse-
 
 ---
 
+## 重要：两套 Key 严格区分（给用户与协助部署的 AI 看）
+
+> **⚠️ 常见误区提醒（请勿让外部 AI 助手手动改乱端口和 Key）：**
+> 一键启动后，画布前端会自动通过 `/local-pool-info` 读取本机 `pool/.env` 中的随机密钥，**无需手动绑定号池 API**。如遇「API 无效 / 401」，99% 是混用了下面两套 Key 或改错了端口：
+
+| 用途 | 接口地址 | 密钥来源 | 负责功能 |
+|---|---|---|---|
+| **1. 月域号池（默认渠道）** | `http://127.0.0.1:18620/v1` | 自动读取本机 `pool/.env` 中的 `MUSE2API_KEY`（格式 `m2a_studio_...`） | 生图（`muse-image`）、生视频（`muse-video`）、视频提示词导演（`muse-spark`） |
+| **2. 右侧 AI Agent（可选）** | 你选择的 DeepSeek / OpenAI / Codex 等地址 | 你自己的外部大模型 `sk-...` 密钥（或本机已登录 Codex） | 右侧智能体对话操控画布 |
+
+- **严禁混用**：不要把 `m2a_studio_...` 填到外部模型渠道，也不要把外部 `sk-...` 填到 `127.0.0.1:18620/v1`。
+- **固定端口**：本机号池端口是 **`18620`**（必须带 `/v1`），不要改成 `18610`，也不要在浏览器访问非 `http://127.0.0.1:3010` 的地址。
+- **网页关闭自动停服**：双击桌面或目录里的 **Muse Studio** 快捷方式启动后，黑框会自动隐藏；只有当你**关闭全部 Muse Studio 网页标签页**后，后台服务才会自动退出。切到后台或最小化不会断连。
+
+---
+
 ## 隐私与安全说明
 
 - 所有个人账号 Cookie、Chrome 隔离配置（`data/browser-profiles/`）、号池随机密钥（`pool/.env`）与 Agent 密钥（`data/agent/canvas-agent.json`）均**仅保存在你的本地电脑**，并已列入 `.gitignore`，不会包含在开源代码中。

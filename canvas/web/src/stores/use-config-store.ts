@@ -536,16 +536,28 @@ if (typeof window !== "undefined") {
         .then((res) => (res.ok ? res.json() : null))
         .then((data: { ok?: boolean; url?: string; apiKey?: string } | null) => {
             if (!data?.ok || !data.apiKey) return;
+            const poolUrl = data.url || "http://127.0.0.1:18620/v1";
             const state = useConfigStore.getState();
-            const defaultChannel = state.config.channels.find((ch) => ch.id === "default");
-            const isLocalPool = !defaultChannel?.baseUrl || /127\.0\.0\.1:18620|localhost:18620/.test(defaultChannel.baseUrl);
-            if (!defaultChannel || (defaultChannel.apiKey === data.apiKey && defaultChannel.baseUrl === (data.url || defaultChannel.baseUrl)) || (!isLocalPool && defaultChannel.apiKey)) return;
-            const nextChannels = state.config.channels.map((ch) =>
-                ch.id === "default" ? { ...ch, baseUrl: data.url || ch.baseUrl, apiKey: data.apiKey || ch.apiKey } : ch,
-            );
+            const isLocalPoolUrl = (u?: string) => !u || /127\.0\.0\.1:186(?:10|20)|localhost:186(?:10|20)/.test(u);
+            let changed = false;
+            const nextChannels = state.config.channels.map((ch) => {
+                if (ch.id === "default" && isLocalPoolUrl(ch.baseUrl)) {
+                    if (ch.apiKey !== data.apiKey || ch.baseUrl !== poolUrl) {
+                        changed = true;
+                        return { ...ch, baseUrl: poolUrl, apiKey: data.apiKey! };
+                    }
+                } else if (isLocalPoolUrl(ch.baseUrl) && ch.apiKey !== data.apiKey) {
+                    changed = true;
+                    return { ...ch, baseUrl: poolUrl, apiKey: data.apiKey! };
+                }
+                return ch;
+            });
+            const defaultChannel = nextChannels.find((ch) => ch.id === "default");
+            const shouldUpdateRoot = (isLocalPoolUrl(state.config.baseUrl) || !state.config.apiKey) && (state.config.apiKey !== data.apiKey || state.config.baseUrl !== poolUrl);
+            if (!changed && !shouldUpdateRoot) return;
             state.setConfig({
                 channels: nextChannels,
-                ...(isLocalPool || !state.config.apiKey ? { apiKey: data.apiKey, baseUrl: data.url || state.config.baseUrl } : {}),
+                ...(shouldUpdateRoot && defaultChannel ? { apiKey: data.apiKey, baseUrl: poolUrl } : {}),
             });
         })
         .catch(() => {
