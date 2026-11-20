@@ -82,11 +82,7 @@ async function shutdownAllServices() {
 }
 
 function scheduleShutdownCheck() {
-    const now = Date.now();
-    // Chrome throttles background-tab timers heavily; only expire truly dead tabs after 10 minutes
-    for (const [id, lastSeen] of activeClients.entries()) {
-        if (now - lastSeen > 600_000) activeClients.delete(id);
-    }
+    // Only shut down when tabs explicitly fire /client-bye (pagehide/beforeunload); never expire background tabs by timer.
     if (hasHadClient && activeClients.size === 0) {
         if (!shutdownTimer) {
             shutdownTimer = setTimeout(() => {
@@ -101,8 +97,6 @@ function scheduleShutdownCheck() {
         shutdownTimer = null;
     }
 }
-
-setInterval(scheduleShutdownCheck, 15_000).unref();
 
 const server = http.createServer((req, res) => {
     const reqUrl = new URL(req.url || "/", `http://${HOST}:${PORT}`);
