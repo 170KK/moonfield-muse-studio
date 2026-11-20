@@ -152,6 +152,32 @@ if (-not (Test-Path (Join-Path $webDir "dist\index.html"))) {
 
 $poolKey = Ensure-PoolEnv
 
+function Ensure-AppShortcuts {
+    $icoPath = Join-Path $root "assets\muse-studio.ico"
+    $batPath = Join-Path $root "启动 Muse Studio.bat"
+    if (-not (Test-Path $icoPath) -or -not (Test-Path $batPath)) { return }
+    try {
+        $wsh = New-Object -ComObject WScript.Shell
+        $desktop = [Environment]::GetFolderPath("Desktop")
+        $targets = @(
+            (Join-Path $root "Muse Studio.lnk"),
+            (Join-Path $desktop "Muse Studio.lnk")
+        )
+        foreach ($lnkPath in $targets) {
+            if (-not $lnkPath) { continue }
+            $sc = $wsh.CreateShortcut($lnkPath)
+            $sc.TargetPath = $batPath
+            $sc.WorkingDirectory = $root
+            $sc.IconLocation = "$icoPath,0"
+            $sc.WindowStyle = 7
+            $sc.Description = "启动月域 · Muse Studio 一体化 AI 导演工作台"
+            $sc.Save()
+        }
+    } catch { }
+}
+
+Ensure-AppShortcuts
+
 Write-Output "[4/4] 正在启动 Muse Studio 服务..."
 
 # 1. Start Muse Studio Pool (18620)
