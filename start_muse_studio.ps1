@@ -144,7 +144,7 @@ Write-Output "[4/4] 正在启动 Muse Studio 服务..."
 
 # 1. Start Muse Studio Pool (18620)
 $env:MUSE2API_HOME = Join-Path $root "pool"
-$poolProc = Start-Process -FilePath $pythonExe -ArgumentList "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "18620" -WorkingDirectory (Join-Path $root "pool") -WindowStyle Minimized -PassThru -RedirectStandardOutput (Join-Path $logDir "pool.out.log") -RedirectStandardError (Join-Path $logDir "pool.err.log")
+$poolProc = Start-Process -FilePath $pythonExe -ArgumentList "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "18620" -WorkingDirectory (Join-Path $root "pool") -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDir "pool.out.log") -RedirectStandardError (Join-Path $logDir "pool.err.log")
 
 # 2. Start Muse Studio Agent (17381)
 $env:PORT = "17381"

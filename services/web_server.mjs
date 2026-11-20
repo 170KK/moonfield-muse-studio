@@ -1,12 +1,15 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DIST_DIR = path.resolve(process.env.MUSE_STUDIO_WEB_DIR || path.join(__dirname, "..", "canvas", "web", "dist"));
+const ROOT_DIR = path.resolve(__dirname, "..");
+const DIST_DIR = path.resolve(process.env.MUSE_STUDIO_WEB_DIR || path.join(ROOT_DIR, "canvas", "web", "dist"));
 const PORT = Number(process.env.MUSE_STUDIO_WEB_PORT || 3010);
 const HOST = process.env.MUSE_STUDIO_WEB_HOST || "127.0.0.1";
+const PID_FILE = path.join(ROOT_DIR, "data", "pids.json");
 
 const MIME = {
     ".html": "text/html; charset=utf-8",
@@ -36,11 +39,92 @@ function readPoolApiKey() {
     }
 }
 
+const activeClients = new Map();
+let hasHadClient = false;
+let shutdownTimer = null;
+let isShuttingDown = false;
+
+function killPidTree(pid) {
+    if (!pid || Number.isNaN(Number(pid)) || Number(pid) === process.pid) return Promise.resolve();
+    return new Promise((resolve) => {
+        if (process.platform === "win32") {
+            execFile("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }, () => resolve());
+        } else {
+            try {
+                process.kill(Number(pid), "SIGTERM");
+            } catch {
+                // ignore
+            }
+            resolve();
+        }
+    });
+}
+
+async function shutdownAllServices() {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log("All Muse Studio browser tabs closed. Shutting down background services...");
+    try {
+        if (fs.existsSync(PID_FILE)) {
+            const pids = JSON.parse(fs.readFileSync(PID_FILE, "utf8"));
+            await Promise.all([killPidTree(pids.pool), killPidTree(pids.agent)]);
+            try {
+                fs.unlinkSync(PID_FILE);
+            } catch {
+                // ignore
+            }
+        }
+    } catch {
+        // ignore
+    }
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 1500).unref();
+}
+
+function scheduleShutdownCheck() {
+    const now = Date.now();
+    for (const [id, lastSeen] of activeClients.entries()) {
+        if (now - lastSeen > 20_000) activeClients.delete(id);
+    }
+    if (hasHadClient && activeClients.size === 0) {
+        if (!shutdownTimer) {
+            shutdownTimer = setTimeout(() => {
+                shutdownTimer = null;
+                if (hasHadClient && activeClients.size === 0) {
+                    void shutdownAllServices();
+                }
+            }, 10_000);
+        }
+    } else if (shutdownTimer) {
+        clearTimeout(shutdownTimer);
+        shutdownTimer = null;
+    }
+}
+
+setInterval(scheduleShutdownCheck, 5_000).unref();
+
 const server = http.createServer((req, res) => {
     const reqUrl = new URL(req.url || "/", `http://${HOST}:${PORT}`);
     if (reqUrl.pathname === "/health") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok" }));
+        return;
+    }
+    if (reqUrl.pathname === "/client-heartbeat") {
+        const clientId = (reqUrl.searchParams.get("id") || "").trim() || "default";
+        hasHadClient = true;
+        activeClients.set(clientId, Date.now());
+        scheduleShutdownCheck();
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+    }
+    if (reqUrl.pathname === "/client-bye") {
+        const clientId = (reqUrl.searchParams.get("id") || "").trim() || "default";
+        activeClients.delete(clientId);
+        scheduleShutdownCheck();
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ ok: true }));
         return;
     }
     if (reqUrl.pathname === "/local-pool-info") {
