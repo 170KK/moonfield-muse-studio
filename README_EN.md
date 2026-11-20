@@ -63,3 +63,13 @@ git clone https://github.com/170KK/moonfield-muse-studio.git; cd moonfield-muse-
 ## Privacy & Security
 
 - All personal cookies, isolated browser profiles (`data/browser-profiles/`), local pool keys (`pool/.env`), and Agent credentials (`data/agent/canvas-agent.json`) stay **strictly local** and are excluded via `.gitignore`.
+
+---
+
+## License & Commercial Use
+
+This project is **free for personal, non-commercial use only** (study, research, evaluation, and non-profit purposes). Commercial use — including selling, renting, paid services, or use in commercial products or for-profit business — is **prohibited** without the author's prior written permission.
+
+**For commercial licensing, contact the author via WeChat: iSevenTeen_**
+
+See the root `LICENSE` file for full terms. Third-party components (infinite-canvas, muse2api, etc.) retain their own MIT licenses; see `LICENSES/`.

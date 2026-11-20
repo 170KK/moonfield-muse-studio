@@ -66,6 +66,16 @@ git clone https://github.com/170KK/moonfield-muse-studio.git; cd moonfield-muse-
 
 ---
 
+---
+
+## 授权与商用
+
+本项目**禁止商用**：仅供个人学习、研究与非营利性使用。未经作者事先书面授权，不得将本项目或其衍生作品用于任何商业用途（包括出售、付费服务、商业产品或营利性业务）。
+
+**如需商用，请联系作者获取授权 —— 微信：iSevenTeen_**
+
+完整条款见根目录 `LICENSE`。第三方组件（infinite-canvas、muse2api 等）继续适用其各自的 MIT 许可证，见 `LICENSES/`。
+
 ## 致谢与第三方组件
 
 本项目基于以下项目构建，版权归各自作者所有：
@@ -74,4 +84,4 @@ git clone https://github.com/170KK/moonfield-muse-studio.git; cd moonfield-muse-
 - **号池引擎（`pool/`）**：基于 muse2api 项目，MIT 许可证，授权文本见 `LICENSES/muse2api-MIT.txt`。
 - **视频导演技能（`skills/muse-video-prompt/`）**：来自 [dichenxiang/muse-video-prompt](https://github.com/dichenxiang/muse-video-prompt)（抖音作者 deverel 丨ai美学丶skill）。原仓库未附开源许可证，版权归原作者所有；本仓库仅为方便一键安装而内置并标注出处，详见该目录下的 `SOURCE.md`，如需再分发请先取得原作者许可。
 
-除上述第三方组件外，本项目其余代码以根目录 `LICENSE`（MIT）授权。
+除上述第三方组件外，本项目其余代码以根目录 `LICENSE` 授权：**仅限非商用，禁止商业使用**；如需商用请联系作者（微信：iSevenTeen_）获取书面授权。

@@ -1,21 +1,42 @@
-MIT License
+月域 Muse Studio 授权协议
+Moonfield Muse Studio License — Non-Commercial Use Only
 
-Copyright (c) 2026 170KK
+版权所有 (c) 2026 170KK（十七）。保留所有权利。
+Copyright (c) 2026 170KK. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+本协议适用于本项目中由作者原创的代码与文档。第三方组件的授权见文末第四条。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+一、允许的用途（非商用）
+在遵守本协议的前提下，授权你免费使用、复制、修改本软件，仅限于个人学习、
+研究、评估及非营利性用途。你可以在非商用范围内分发本软件的原始副本或修改
+副本，但必须保留本授权文件与版权声明。
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+二、禁止商用
+未经作者事先书面授权，禁止将本软件或其衍生作品用于任何商业用途，包括但
+不限于：
+  - 出售、出租、再授权收费，或以本软件为基础提供付费服务；
+  - 在商业产品、商业项目或营利性业务中使用；
+  - 以本软件直接或间接获取商业收益。
+
+三、商用授权联系方式
+如需商用，请先联系作者获取书面授权：
+微信 WeChat：iSevenTeen_
+
+四、第三方组件
+本项目包含的第三方组件继续适用其各自的许可证，不受本协议限制：
+  - canvas/ 基于 infinite-canvas（MIT），见 LICENSES/infinite-canvas-MIT.txt；
+  - pool/ 基于 muse2api（MIT），见 LICENSES/muse2api-MIT.txt；
+  - skills/muse-video-prompt/ 版权归其原作者所有，见该目录下 SOURCE.md。
+
+五、免责声明
+本软件按"原样"提供，不附任何明示或暗示的担保，包括但不限于适销性与特定
+用途适用性。作者不对因使用或无法使用本软件造成的任何损害或损失承担责任。
+
+English Summary
+This software is free for personal, non-commercial use only (study, research,
+evaluation, and non-profit purposes). Commercial use — including selling,
+renting, paid services, or use in commercial products or for-profit business —
+is PROHIBITED without the author's prior written permission.
+For commercial licensing, contact the author via WeChat: iSevenTeen_
+Third-party components bundled in this repository retain their own licenses
+(see LICENSES/).
