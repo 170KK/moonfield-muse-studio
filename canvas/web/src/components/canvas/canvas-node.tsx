@@ -791,6 +791,16 @@ function VideoNodeContent({ node, theme, scale, batchExpanded, onToggleBatch, on
     const videos = node.metadata?.videos || [];
     const batchCount = videos.length;
     const loadingCount = videos.filter((v) => v.status === "loading").length;
+    useEffect(() => {
+        const now = Date.now();
+        for (const v of videos) {
+            if (v.status === "loading") {
+                if (!loadingStartTimes.has(v.id)) loadingStartTimes.set(v.id, now);
+            } else {
+                loadingStartTimes.delete(v.id);
+            }
+        }
+    }, [videos]);
     const isBatchRoot = batchCount > 1;
     const primaryVideoId = node.metadata?.primaryVideoId || videos[0]?.id;
     const primaryVideo = videos.find((v) => v.id === primaryVideoId);
@@ -831,7 +841,7 @@ function VideoNodeContent({ node, theme, scale, batchExpanded, onToggleBatch, on
                     <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 px-4 text-center" style={{ background: theme.node.fill, color: theme.node.activeStroke }}>
                         <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />
                         <span className="text-[10px] tracking-[0.2em]">{t("canvas.node.generating")}</span>
-                        <GeneratingElapsed hint="视频生成/轮询中 · 点下方停止可取消" />
+                        <GeneratingElapsed trackKey={primaryVideo?.id || node.id} hint="视频生成/轮询中 · 点下方停止可取消" />
                     </div>
                 )}
             </div>
@@ -1003,6 +1013,16 @@ function ImageContent({
     const images = node.metadata?.images || [];
     const batchCount = images.length;
     const loadingCount = images.filter((image) => image.status === "loading").length;
+    useEffect(() => {
+        const now = Date.now();
+        for (const img of images) {
+            if (img.status === "loading") {
+                if (!loadingStartTimes.has(img.id)) loadingStartTimes.set(img.id, now);
+            } else {
+                loadingStartTimes.delete(img.id);
+            }
+        }
+    }, [images]);
     const isBatchRoot = batchCount > 1;
     const primaryImageId = node.metadata?.primaryImageId || images[0]?.id;
     const primaryImage = images.find((image) => image.id === primaryImageId);
@@ -1037,7 +1057,7 @@ function ImageContent({
                         className={`pointer-events-none block h-full w-full select-none ${node.metadata?.freeResize ? "object-fill" : "object-contain"}`}
                     />
                 ) : (
-                    <ImageSlotStatus image={primaryImage} />
+                    <ImageSlotStatus image={primaryImage} trackKey={primaryImage?.id || node.id} />
                 )}
             </div>
             {primaryImage?.status === "error" ? <BatchImageFailureActions placement="left" onRetry={() => onRetryBatchImage?.(primaryImage.id)} onDelete={() => onDeleteBatchImage?.(primaryImage.id)} /> : null}
@@ -1129,7 +1149,7 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
                 onView();
             }}
         >
-            {image.content ? <img src={source} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" /> : <ImageSlotStatus image={image} />}
+            {image.content ? <img src={source} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" /> : <ImageSlotStatus image={image} trackKey={image.id} />}
             {image.content ? (
                 <div className="pointer-events-none absolute inset-x-1.5 top-1.5 flex items-center justify-end gap-1 opacity-0 transition-opacity duration-150 group-hover/node:pointer-events-auto group-hover/node:opacity-100">
                     <button type="button" className="flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-[10px] font-medium shadow-[0_4px_12px_rgba(15,23,42,.18)] backdrop-blur-md transition hover:scale-[1.03]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>
@@ -1167,12 +1187,26 @@ function BatchImageFailureActions({ placement, onRetry, onDelete }: { placement:
     );
 }
 
-function GeneratingElapsed({ hint }: { hint?: string }) {
-    const [sec, setSec] = useState(0);
+const loadingStartTimes = new Map<string, number>();
+
+function GeneratingElapsed({ trackKey, hint }: { trackKey?: string; hint?: string }) {
+    const startMs = useMemo(() => {
+        if (!trackKey) return Date.now();
+        const existing = loadingStartTimes.get(trackKey);
+        if (existing) return existing;
+        const now = Date.now();
+        loadingStartTimes.set(trackKey, now);
+        return now;
+    }, [trackKey]);
+
+    const [sec, setSec] = useState(() => Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
     useEffect(() => {
-        const timer = window.setInterval(() => setSec((prev) => prev + 1), 1000);
+        setSec(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
+        const timer = window.setInterval(() => {
+            setSec(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
+        }, 1000);
         return () => window.clearInterval(timer);
-    }, []);
+    }, [startMs]);
     return (
         <div className="flex flex-col items-center gap-0.5 text-[10px] opacity-75">
             <span>已等待 {sec}s</span>
@@ -1181,15 +1215,18 @@ function GeneratingElapsed({ hint }: { hint?: string }) {
     );
 }
 
-function ImageSlotStatus({ image }: { image?: CanvasNodeImage }) {
+function ImageSlotStatus({ image, trackKey }: { image?: CanvasNodeImage; trackKey?: string }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { t } = useTranslation();
     const failed = image?.status === "error";
+    useEffect(() => {
+        if (failed && trackKey) loadingStartTimes.delete(trackKey);
+    }, [failed, trackKey]);
     return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 px-4 text-center" style={{ background: theme.node.fill, color: failed ? theme.node.text : theme.node.activeStroke }}>
             {failed ? <span className="text-xs leading-5">{image.errorDetails || t("canvas.node.failed")}</span> : <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />}
             {!failed ? <span className="text-[10px] tracking-[0.2em]">{t("canvas.node.generating")}</span> : null}
-            {!failed ? <GeneratingElapsed hint="出图请求中 · 点停止可取消" /> : null}
+            {!failed ? <GeneratingElapsed trackKey={trackKey} hint="出图请求中 · 点停止可取消" /> : null}
         </div>
     );
 }
