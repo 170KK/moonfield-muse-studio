@@ -717,21 +717,33 @@ function EmptyImageContent({ theme }: NodeContentRendererProps) {
 
 function CanvasVideoPlayer({ src, className, nodeId, onDoubleClick }: { src: string; className?: string; nodeId?: string; onDoubleClick?: (event: React.MouseEvent) => void }) {
     const [isPlaying, setIsPlaying] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const videoRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
         setIsPlaying(false);
     }, [src]);
 
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const el = videoRef.current;
+            setIsFullscreen(Boolean(el && document.fullscreenElement === el));
+        };
+        document.addEventListener("fullscreenchange", handleFullscreenChange);
+        return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    }, []);
+
+    const showNativeControls = isPlaying || isFullscreen;
+
     return (
         <div className="relative h-full w-full" onDoubleClick={onDoubleClick}>
             <video
                 ref={videoRef}
                 src={src}
-                controls={isPlaying}
+                controls={showNativeControls}
                 playsInline
                 preload="auto"
-                className={`${className || "h-full w-full bg-black object-contain"} ${isPlaying ? "" : "pointer-events-none"}`}
+                className={`${className || "h-full w-full bg-black object-contain"} ${showNativeControls ? "" : "pointer-events-none"}`}
                 data-canvas-video={nodeId}
                 onLoadedMetadata={(event) => {
                     const el = event.currentTarget;
@@ -747,7 +759,7 @@ function CanvasVideoPlayer({ src, className, nodeId, onDoubleClick }: { src: str
                 onPause={() => setIsPlaying(false)}
                 onEnded={() => setIsPlaying(false)}
             />
-            {!isPlaying ? (
+            {!isPlaying && !isFullscreen ? (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                     <button
                         type="button"
