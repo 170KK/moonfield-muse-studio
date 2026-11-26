@@ -131,9 +131,27 @@ export function VideoDirectorDrawer({
         });
     };
 
+    const resolveDirectorAuthKey = async () => {
+        const direct = reqCfg.apiKey.trim();
+        if (direct) return direct;
+        if (!reqCfg.baseUrl || /127\.0\.0\.1|localhost/.test(reqCfg.baseUrl)) {
+            try {
+                const r = await fetch("/local-pool-info", { cache: "no-store" });
+                if (r.ok) {
+                    const info = (await r.json()) as { ok?: boolean; apiKey?: string };
+                    if (info?.ok && info.apiKey) return info.apiKey.trim();
+                }
+            } catch {
+                // ignore
+            }
+        }
+        return "";
+    };
+
     const callTextCompletion = async (sysPrompt: string, chatMessages: Array<{ role: "user" | "assistant"; content: string }>, signal?: AbortSignal) => {
         const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (reqCfg.apiKey.trim()) headers.Authorization = `Bearer ${reqCfg.apiKey.trim()}`;
+        const authKey = await resolveDirectorAuthKey();
+        if (authKey) headers.Authorization = `Bearer ${authKey}`;
         const res = await fetch(buildApiUrl(reqCfg.baseUrl, "/chat/completions"), {
             method: "POST",
             headers,
@@ -211,7 +229,8 @@ export function VideoDirectorDrawer({
 
         try {
             const headers: Record<string, string> = { "Content-Type": "application/json" };
-            if (reqCfg.apiKey.trim()) headers.Authorization = `Bearer ${reqCfg.apiKey.trim()}`;
+            const authKey = await resolveDirectorAuthKey();
+            if (authKey) headers.Authorization = `Bearer ${authKey}`;
 
             const res = await fetch(buildApiUrl(reqCfg.baseUrl, "/chat/completions"), {
                 method: "POST",
