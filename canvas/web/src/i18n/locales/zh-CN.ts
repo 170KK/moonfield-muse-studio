@@ -246,7 +246,7 @@ export default {
         miniMapClose: "关闭小地图",
         resetView: "重置视图",
         zoom: "放大/缩小画布",
-        agentConnected: "Codex 已连接",
+        agentConnected: "Agent 服务就绪",
         agentConnecting: "Codex {{activity}}",
         agentDisconnected: "Codex 未连接",
         connecting: "连接中",
