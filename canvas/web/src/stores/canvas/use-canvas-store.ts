@@ -117,6 +117,7 @@ function mergeCanvasStates(
 }
 
 async function flushPendingCanvasPersist(name = CANVAS_STORE_KEY) {
+    if (!useCanvasStore.getState().hydrated) return;
     if (saveTimer) {
         clearTimeout(saveTimer);
         saveTimer = null;
@@ -164,6 +165,7 @@ async function flushPendingCanvasPersist(name = CANVAS_STORE_KEY) {
 }
 
 async function syncCanvasFromStorage() {
+    if (!useCanvasStore.getState().hydrated) return;
     if (saveTimer || pendingPersistValue) return;
     try {
         const raw = await localForageStorage.getItem(CANVAS_STORE_KEY);
@@ -214,11 +216,26 @@ if (typeof window !== "undefined") {
 
 const canvasStorage: PersistStorage<CanvasStore> = {
     getItem: async (name) => {
-        const value = await localForageStorage.getItem(name);
-        if (!value) return null;
-        const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
-        queuedPersistState = parsed.state as PersistedCanvasState;
-        return parsed;
+        try {
+            const value = await Promise.race([
+                localForageStorage.getItem(name),
+                new Promise<string | null>((resolve) =>
+                    setTimeout(() => {
+                        try {
+                            resolve(typeof window !== "undefined" ? window.localStorage.getItem(name) : null);
+                        } catch {
+                            resolve(null);
+                        }
+                    }, 2500),
+                ),
+            ]);
+            if (!value) return null;
+            const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
+            queuedPersistState = parsed.state as PersistedCanvasState;
+            return parsed;
+        } catch {
+            return null;
+        }
     },
     setItem: (name, value) => {
         if (isExternalRehydrate) return;
