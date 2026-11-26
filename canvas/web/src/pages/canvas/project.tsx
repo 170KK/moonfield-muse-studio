@@ -2640,6 +2640,46 @@ function InfiniteCanvasPage() {
     const handleDrop = useCallback(
         (event: ReactDragEvent<HTMLDivElement>) => {
             event.preventDefault();
+            const assetId = event.dataTransfer.getData("text/muse-asset-id");
+            if (assetId) {
+                const asset = useAssetStore.getState().assets.find((item) => item.id === assetId);
+                if (asset) {
+                    const dropPos = screenToCanvas(event.clientX, event.clientY);
+                    if (asset.kind === "video") {
+                        const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
+                        const nextSize = fitNodeSize(asset.width || spec.width, asset.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
+                        const id = `video-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                        setNodes((prev) => [
+                            ...prev,
+                            {
+                                id,
+                                type: CanvasNodeType.Video,
+                                title: asset.prompt || asset.id,
+                                position: { x: dropPos.x - nextSize.width / 2, y: dropPos.y - nextSize.height / 2 },
+                                width: nextSize.width,
+                                height: nextSize.height,
+                                metadata: {
+                                    content: asset.dataUrl,
+                                    storageKey: asset.storageKey,
+                                    status: NODE_STATUS_SUCCESS,
+                                    naturalWidth: asset.width,
+                                    naturalHeight: asset.height,
+                                },
+                            },
+                        ]);
+                        setSelectedNodeIds(new Set([id]));
+                    } else {
+                        const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
+                        const nextSize = fitNodeSize(asset.width || spec.width, asset.height || spec.height, spec.width, spec.height);
+                        void insertAssistantImage(
+                            { id: `asset-${Date.now()}`, prompt: asset.prompt || asset.id, dataUrl: asset.dataUrl, storageKey: asset.storageKey },
+                            { position: { x: dropPos.x - nextSize.width / 2, y: dropPos.y - nextSize.height / 2 } },
+                        );
+                    }
+                    return;
+                }
+            }
+
             const files = Array.from(event.dataTransfer.files).filter(
                 (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item),
             );
@@ -2659,7 +2699,7 @@ function InfiniteCanvasPage() {
                 }
             }
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas],
+        [createAudioFileNode, createImageFileNode, createVideoFileNode, insertAssistantImage, screenToCanvas],
     );
 
     const startTitleEditing = useCallback(() => {
