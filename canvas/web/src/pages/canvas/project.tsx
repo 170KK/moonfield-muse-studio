@@ -3783,6 +3783,39 @@ function InfiniteCanvasPage() {
 
             if (payload.kind === "text") {
                 createdId = insertAssistantText(payload.content, payload.title, { position: insertPos, keepSelection });
+            } else if (payload.kind === "video-prompt") {
+                const spec = nodeSizeFromRatio(payload.aspect, NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
+                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+                const id = `video-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                setNodes((prev) => [
+                    ...prev,
+                    {
+                        id,
+                        type: CanvasNodeType.Video,
+                        title: payload.title,
+                        position: insertPos || { x: center.x - spec.width / 2, y: center.y - spec.height / 2 },
+                        width: spec.width,
+                        height: spec.height,
+                        metadata: {
+                            prompt: payload.prompt,
+                            status: NODE_STATUS_IDLE,
+                            model: effectiveConfig.videoModel || "muse-video",
+                            size: payload.aspect || effectiveConfig.size || "16:9",
+                            seconds: String(payload.seconds || effectiveConfig.videoSeconds || "10"),
+                            vquality: effectiveConfig.vquality || "720p",
+                            fps: effectiveConfig.videoFps || "30",
+                            generateAudio: effectiveConfig.videoGenerateAudio || "on",
+                            watermark: effectiveConfig.videoWatermark || "off",
+                            videoMode: effectiveConfig.videoMode || "first_last",
+                        },
+                    },
+                ]);
+                if (!keepSelection) {
+                    setSelectedNodeIds(new Set([id]));
+                    setDialogNodeId(id);
+                }
+                createdId = id;
+                message.success(`已新建视频节点：${payload.title}`);
             } else if (payload.kind === "video") {
                 const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                 const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);

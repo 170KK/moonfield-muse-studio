@@ -1120,7 +1120,7 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ onInsert, theme }: { o
     const sources = usePromptSourceStore((state) => state.sources);
     const enabledSources = useMemo(() => sources.filter((source) => source.enabled), [sources]);
     const [keyword, setKeyword] = useState("");
-    const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({ "muse-video-prompts": true });
     const [detail, setDetail] = useState<Prompt | null>(null);
 
     const copyPrompt = async (prompt: string) => {
@@ -1191,6 +1191,14 @@ function PromptSourceGroup({
     }, [query.data, keyword]);
 
     const insertPrompt = (item: Prompt) => onInsert({ kind: "text", content: item.prompt, title: item.title });
+    const createVideoNodeFromPrompt = (item: Prompt) =>
+        onInsert({
+            kind: "video-prompt",
+            prompt: item.prompt,
+            title: item.title,
+            aspect: item.imageSize || undefined,
+            seconds: item.imageCount || undefined,
+        });
 
     return (
         <div>
@@ -1213,7 +1221,7 @@ function PromptSourceGroup({
                     ) : filtered.length ? (
                         <div className="space-y-1.5">
                             {filtered.map((item) => (
-                                <PromptRow key={item.id} item={item} theme={theme} onInsert={() => insertPrompt(item)} onView={() => onView(item)} />
+                                <PromptRow key={item.id} item={item} theme={theme} onInsert={() => insertPrompt(item)} onCreateVideo={() => createVideoNodeFromPrompt(item)} onView={() => onView(item)} />
                             ))}
                         </div>
                     ) : (
@@ -1225,7 +1233,7 @@ function PromptSourceGroup({
     );
 }
 
-function PromptRow({ item, theme, onInsert, onView }: { item: Prompt; theme: CanvasTheme; onInsert: () => void; onView: () => void }) {
+function PromptRow({ item, theme, onInsert, onCreateVideo, onView }: { item: Prompt; theme: CanvasTheme; onInsert: () => void; onCreateVideo: () => void; onView: () => void }) {
     const { t } = useTranslation();
     return (
         <div className="group relative flex items-center gap-2.5 rounded-lg px-2 py-2 transition hover:bg-black/5 dark:hover:bg-white/5">
@@ -1238,9 +1246,18 @@ function PromptRow({ item, theme, onInsert, onView }: { item: Prompt; theme: Can
             )}
             <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
                 <div className="truncate text-sm font-medium leading-snug">{item.title}</div>
-                <div className="mt-0.5 truncate text-xs leading-snug opacity-50">{item.prompt}</div>
+                <div className="mt-0.5 truncate text-xs leading-snug opacity-50">{item.description || item.prompt}</div>
             </button>
-            <div className="flex shrink-0 flex-col items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-0.5">
+                <button
+                    type="button"
+                    onClick={onCreateVideo}
+                    className="grid size-6 place-items-center rounded-md opacity-70 transition hover:bg-indigo-500/15 hover:text-indigo-500 hover:opacity-100"
+                    title="一键新建视频节点"
+                    aria-label="一键新建视频节点"
+                >
+                    <Video className="size-3.5" />
+                </button>
                 <button type="button" onClick={onView} className="grid size-6 place-items-center rounded-md opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10" aria-label={t("canvas.sidePanel.viewDetails")} title={t("canvas.sidePanel.viewDetails")}>
                     <Eye className="size-3.5" />
                 </button>
@@ -1250,7 +1267,7 @@ function PromptRow({ item, theme, onInsert, onView }: { item: Prompt; theme: Can
                     className="grid size-6 place-items-center rounded-md opacity-60 transition hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10"
                     style={{ color: theme.toolbar.activeText }}
                     aria-label={t("canvas.sidePanel.inserted")}
-                    title={t("canvas.sidePanel.inserted")}
+                    title="插入文本节点"
                 >
                     <Plus className="size-3.5" />
                 </button>
