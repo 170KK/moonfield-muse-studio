@@ -1415,10 +1415,11 @@ class MuseEngine:
                         txt_stable += 1
                     else:
                         last_txt, txt_stable = cur_txt, 0
-                    if txt_stable >= 15 and elapsed > 8.0:
+                    stable_limit = 90 if expect == "video" else 45
+                    if txt_stable >= stable_limit and elapsed > 20.0:
                         clean = self._clean_model_text(cur_txt)
-                        raise MuseModelRefusalError(
-                            f"模型未生成媒体，仅返回文本: {clean}")
+                        raise MuseGenerationError(
+                            f"模型仅返回文本且长时间未出现媒体: {clean}")
                 else:
                     txt_stable = 0
             else:
@@ -1459,6 +1460,7 @@ class MuseEngine:
             r"\.(?:webp|png|jpe?g|mp4|webm)|imagine_media|deliverable|"
             r"generated\s+.*image|verified\s+generated|artifact|"
             r"^(?:已(?:经)?(?:成功)?生成|生成好了|生成完毕|已完成|做好了)(?:[，。！\s]|$)|"
+            r"抽查的几帧|这个版本接受|还是重做|这一版|正在渲染|正在生成|开始生成|请稍等|请稍候|"
             r"(?:视频|影片|短片|图片|图像)[^。！？!?\n]{0,40}"
             r"(?:已(?:经)?(?:成功)?生成|生成(?:成功|好了|完毕|完成)|已(?:经)?完成|做好了)|"
             r"(?:已(?:经)?(?:成功)?生成|生成好了|生成完毕|已完成|做好了)"

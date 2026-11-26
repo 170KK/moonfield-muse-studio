@@ -111,7 +111,7 @@ function Ensure-PoolEnv {
         "MUSE2API_CHROMIUM=$browserPath",
         "MUSE2API_CDP_PORT=19220",
         "MUSE2API_PROFILE_ROOT=$profileDir",
-        "MUSE2API_IMAGE_TIMEOUT=240",
+        "MUSE2API_IMAGE_TIMEOUT=360",
         "MUSE2API_VIDEO_TIMEOUT=1800",
         "MUSE2API_CHAT_TIMEOUT=300",
         "MUSE2API_CONCURRENCY=2",
