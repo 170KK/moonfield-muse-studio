@@ -32,6 +32,7 @@ export function CanvasTopBar({
     compactAgentStatus,
     onToggleAgent,
     onOpenDirector,
+    onOpenPromptLibrary,
     onOpenBatchDownload,
 }: {
     title: string;
@@ -56,6 +57,7 @@ export function CanvasTopBar({
     compactAgentStatus: { connected: boolean; enabled: boolean; activity: string };
     onToggleAgent: () => void;
     onOpenDirector?: () => void;
+    onOpenPromptLibrary?: () => void;
     onOpenBatchDownload?: () => void;
 }) {
     const colorTheme = useThemeStore((state) => state.theme);
@@ -145,6 +147,17 @@ export function CanvasTopBar({
                 <div className="pointer-events-auto flex items-center gap-1.5">
                     <UserStatusActions variant="canvas" onOpenShortcuts={() => setShortcutsOpen(true)} onOpenPlugins={onOpenPlugins} />
                     <span className="h-6 w-px" style={{ background: theme.toolbar.border }} />
+                    {onOpenPromptLibrary ? (
+                        <Button
+                            type="text"
+                            className="!h-10 !rounded-xl !px-3 !font-medium"
+                            style={{ background: theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
+                            icon={<BookOpen className="size-4 text-indigo-500" />}
+                            onClick={onOpenPromptLibrary}
+                        >
+                            提示词库
+                        </Button>
+                    ) : null}
                     {onOpenDirector ? (
                         <Button
                             type="text"

@@ -42,6 +42,7 @@ import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "@/componen
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/asset-picker-modal";
 import { VideoBatchDownloadModal } from "@/components/canvas/video-batch-download-modal";
+import { MuseVideoPromptModal } from "@/components/canvas/muse-video-prompt-modal";
 import { VideoDirectorDrawer } from "@/components/canvas/video-director-drawer";
 import { extractAiPromptForGeneration, type DirectorStructuredWorkflow } from "@/lib/video-director-prompt";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
@@ -257,6 +258,7 @@ function InfiniteCanvasPage() {
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [assetPickerTargetNodeId, setAssetPickerTargetNodeId] = useState<string | null>(null);
     const [directorOpen, setDirectorOpen] = useState(false);
+    const [promptLibraryOpen, setPromptLibraryOpen] = useState(false);
     const [directorSourceNodeId, setDirectorSourceNodeId] = useState<string | undefined>(undefined);
     const [directorInitialText, setDirectorInitialText] = useState<string | undefined>(undefined);
     const [batchDownloadOpen, setBatchDownloadOpen] = useState(false);
@@ -4003,6 +4005,7 @@ function InfiniteCanvasPage() {
                         setDirectorInitialText(undefined);
                         setDirectorOpen(true);
                     }}
+                    onOpenPromptLibrary={() => setPromptLibraryOpen(true)}
                     onOpenBatchDownload={() => setBatchDownloadOpen(true)}
                 />
 
@@ -4611,6 +4614,12 @@ function InfiniteCanvasPage() {
                     nodes={nodes}
                     initialSelectedIds={selectedNodeIds}
                     onClose={() => setBatchDownloadOpen(false)}
+                />
+                <MuseVideoPromptModal
+                    open={promptLibraryOpen}
+                    onClose={() => setPromptLibraryOpen(false)}
+                    onCreateVideoNode={(item) => void handleAssetInsert({ kind: "video-prompt", ...item })}
+                    onInsertTextNode={(item) => void handleAssetInsert({ kind: "text", content: item.prompt, title: item.title })}
                 />
             </section>
         </main>
