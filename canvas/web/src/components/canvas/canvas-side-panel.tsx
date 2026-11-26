@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
+import { isLongOrMultiSegmentPrompt, splitLongVideoPrompt } from "@/lib/video-prompt-splitter";
 import { exportCanvasNodes } from "@/lib/canvas/canvas-export";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { cn } from "@/lib/utils";
@@ -1191,7 +1192,19 @@ function PromptSourceGroup({
     }, [query.data, keyword]);
 
     const insertPrompt = (item: Prompt) => onInsert({ kind: "text", content: item.prompt, title: item.title });
-    const createVideoNodeFromPrompt = (item: Prompt) =>
+    const createVideoNodeFromPrompt = (item: Prompt) => {
+        if (isLongOrMultiSegmentPrompt(item.prompt, item.imageCount, item.tags)) {
+            const segments = splitLongVideoPrompt(item.prompt, item.imageCount || 30, item.title);
+            if (segments.length >= 2) {
+                onInsert({
+                    kind: "video-chain",
+                    title: item.title,
+                    segments,
+                    aspect: item.imageSize || undefined,
+                });
+                return;
+            }
+        }
         onInsert({
             kind: "video-prompt",
             prompt: item.prompt,
@@ -1199,6 +1212,7 @@ function PromptSourceGroup({
             aspect: item.imageSize || undefined,
             seconds: item.imageCount || undefined,
         });
+    };
 
     return (
         <div>

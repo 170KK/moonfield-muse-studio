@@ -11,7 +11,8 @@ export type InsertAssetPayload =
     | { kind: "text"; content: string; title: string }
     | { kind: "image"; dataUrl: string; title: string; storageKey?: string }
     | { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number }
-    | { kind: "video-prompt"; prompt: string; title: string; aspect?: string; seconds?: number };
+    | { kind: "video-prompt"; prompt: string; title: string; aspect?: string; seconds?: number }
+    | { kind: "video-chain"; title: string; segments: Array<{ id: string; title: string; prompt: string; duration: number }>; aspect?: string };
 
 type Props = {
     open: boolean;

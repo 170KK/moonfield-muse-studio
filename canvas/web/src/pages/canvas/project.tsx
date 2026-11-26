@@ -2783,7 +2783,7 @@ function InfiniteCanvasPage() {
                             : [];
                     let videoDerivedRefs: typeof generationContext.referenceImages = [];
                     if (!generationContext.referenceImages.length && generationContext.referenceVideos.length > 0) {
-                        const firstVidUrl = generationContext.referenceVideos[0]?.dataUrl;
+                        const firstVidUrl = generationContext.referenceVideos[0]?.url;
                         if (firstVidUrl) {
                             try {
                                 const frameBlob = await captureVideoFrame(firstVidUrl, "last", 0);
@@ -3786,7 +3786,7 @@ function InfiniteCanvasPage() {
             if (payload.kind === "text") {
                 createdId = insertAssistantText(payload.content, payload.title, { position: insertPos, keepSelection });
             } else if (payload.kind === "video-prompt") {
-                const spec = nodeSizeFromRatio(payload.aspect, NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
+                const spec = nodeSizeFromRatio(payload.aspect || "16:9", NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                 const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
                 const id = `video-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
                 setNodes((prev) => [
@@ -3818,6 +3818,50 @@ function InfiniteCanvasPage() {
                 }
                 createdId = id;
                 message.success(`已新建视频节点：${payload.title}`);
+            } else if (payload.kind === "video-chain") {
+                const spec = nodeSizeFromRatio(payload.aspect || "16:9", NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
+                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+                const baseX = (insertPos?.x ?? center.x - spec.width / 2);
+                const baseY = (insertPos?.y ?? center.y - spec.height / 2);
+                const newNodes: CanvasNodeData[] = [];
+                const newConns: CanvasConnection[] = [];
+                let prevId = "";
+                for (let idx = 0; idx < payload.segments.length; idx += 1) {
+                    const seg = payload.segments[idx];
+                    const id = `video-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
+                    newNodes.push({
+                        id,
+                        type: CanvasNodeType.Video,
+                        title: seg.title,
+                        position: { x: baseX + idx * (spec.width + 110), y: baseY },
+                        width: spec.width,
+                        height: spec.height,
+                        metadata: {
+                            prompt: seg.prompt,
+                            status: NODE_STATUS_IDLE,
+                            model: effectiveConfig.videoModel || "muse-video",
+                            size: payload.aspect || effectiveConfig.size || "16:9",
+                            seconds: String(seg.duration || 10),
+                            vquality: effectiveConfig.vquality || "720p",
+                            fps: effectiveConfig.videoFps || "30",
+                            generateAudio: effectiveConfig.videoGenerateAudio || "on",
+                            watermark: effectiveConfig.videoWatermark || "off",
+                            videoMode: effectiveConfig.videoMode || "first_last",
+                            continuityMode: idx === 0 ? "ref-only" : "tail-frame",
+                            remark: `${seg.id}${idx > 0 ? "（尾帧接力）" : ""}`,
+                        },
+                    });
+                    if (prevId) newConns.push({ id: nanoid(), fromNodeId: prevId, toNodeId: id });
+                    prevId = id;
+                }
+                setNodes((prev) => [...prev, ...newNodes]);
+                if (newConns.length) setConnections((prev) => [...prev, ...newConns]);
+                if (newNodes[0] && !keepSelection) {
+                    setSelectedNodeIds(new Set([newNodes[0].id]));
+                    setDialogNodeId(newNodes[0].id);
+                }
+                createdId = newNodes[0]?.id;
+                message.success(`已自动拆分为 ${newNodes.length} 段尾帧接力视频链：${payload.title}`);
             } else if (payload.kind === "video") {
                 const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                 const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
@@ -4619,6 +4663,7 @@ function InfiniteCanvasPage() {
                     open={promptLibraryOpen}
                     onClose={() => setPromptLibraryOpen(false)}
                     onCreateVideoNode={(item) => void handleAssetInsert({ kind: "video-prompt", ...item })}
+                    onCreateVideoChain={(item) => void handleAssetInsert({ kind: "video-chain", ...item })}
                     onInsertTextNode={(item) => void handleAssetInsert({ kind: "text", content: item.prompt, title: item.title })}
                 />
             </section>

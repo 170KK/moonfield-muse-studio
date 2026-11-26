@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { App, Button, Empty, Input, Modal, Select, Spin, Tag } from "antd";
 import { BookOpen, Copy, FileText, Search, Star, Video } from "lucide-react";
 
+import { isLongOrMultiSegmentPrompt, splitLongVideoPrompt, type SplitVideoSegment } from "@/lib/video-prompt-splitter";
+
 type MusePromptItem = {
     id: string;
     title: string;
@@ -30,11 +32,13 @@ export function MuseVideoPromptModal({
     open,
     onClose,
     onCreateVideoNode,
+    onCreateVideoChain,
     onInsertTextNode,
 }: {
     open: boolean;
     onClose: () => void;
     onCreateVideoNode: (item: { title: string; prompt: string; aspect?: string; seconds?: number }) => void;
+    onCreateVideoChain: (item: { title: string; segments: SplitVideoSegment[]; aspect?: string }) => void;
     onInsertTextNode: (item: { title: string; prompt: string }) => void;
 }) {
     const { message } = App.useApp();
@@ -282,6 +286,19 @@ export function MuseVideoPromptModal({
                                                     type="primary"
                                                     icon={<Video className="size-3" />}
                                                     onClick={() => {
+                                                        const isLong = isLongOrMultiSegmentPrompt(item.prompt, item.imageCount, item.tags);
+                                                        if (isLong) {
+                                                            const segments = splitLongVideoPrompt(item.prompt, item.imageCount || 30, item.title);
+                                                            if (segments.length >= 2) {
+                                                                onCreateVideoChain({
+                                                                    title: item.title,
+                                                                    segments,
+                                                                    aspect: item.imageSize || undefined,
+                                                                });
+                                                                onClose();
+                                                                return;
+                                                            }
+                                                        }
                                                         onCreateVideoNode({
                                                             title: item.title,
                                                             prompt: item.prompt,
@@ -291,7 +308,7 @@ export function MuseVideoPromptModal({
                                                         onClose();
                                                     }}
                                                 >
-                                                    建视频节点
+                                                    {isLongOrMultiSegmentPrompt(item.prompt, item.imageCount, item.tags) ? "拆段尾帧链" : "建视频节点"}
                                                 </Button>
                                             </div>
                                         </div>

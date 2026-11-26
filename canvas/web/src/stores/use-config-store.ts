@@ -555,7 +555,7 @@ if (typeof window !== "undefined") {
             const defaultChannel = nextChannels.find((ch) => ch.id === "default");
             const shouldUpdateRoot = (isLocalPoolUrl(state.config.baseUrl) || !state.config.apiKey) && (state.config.apiKey !== data.apiKey || state.config.baseUrl !== poolUrl);
             if (!changed && !shouldUpdateRoot) return;
-            state.setConfig({
+            state.updateConfig({
                 channels: nextChannels,
                 ...(shouldUpdateRoot && defaultChannel ? { apiKey: data.apiKey, baseUrl: poolUrl } : {}),
             });
