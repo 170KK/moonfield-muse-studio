@@ -735,7 +735,7 @@ function normalizeLogConfig(log: Partial<GenerationLog>): GenerationLogConfig {
         videoSeconds: log.config?.videoSeconds || log.seconds || "",
         videoGenerateAudio: log.config?.videoGenerateAudio || "true",
         videoWatermark: log.config?.videoWatermark || "false",
-        videoMode: log.config?.videoMode === "reference" ? "reference" : "frames",
+        videoMode: log.config?.videoMode === "strict" ? "strict" : log.config?.videoMode === "reference" ? "reference" : "frames",
     };
 }
 
@@ -748,7 +748,7 @@ function buildLog({ prompt, model, config, references, durationMs, status, task,
         videoSeconds: config.videoSeconds,
         videoGenerateAudio: config.videoGenerateAudio,
         videoWatermark: config.videoWatermark,
-        videoMode: config.videoMode === "reference" ? "reference" : "frames",
+        videoMode: config.videoMode === "strict" ? "strict" : config.videoMode === "reference" ? "reference" : "frames",
     };
     return {
         id: nanoid(),
@@ -780,7 +780,7 @@ function buildVideoConfig(config: AiConfig, model: string): AiConfig {
         vquality: normalizeResolution(config.vquality),
         videoGenerateAudio: String(boolConfig(config.videoGenerateAudio, true)),
         videoWatermark: String(boolConfig(config.videoWatermark, false)),
-        videoMode: config.videoMode === "reference" ? "reference" : "frames",
+        videoMode: config.videoMode === "strict" ? "strict" : config.videoMode === "reference" ? "reference" : "frames",
     };
 }
 

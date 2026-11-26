@@ -569,6 +569,7 @@ class ImageRequest(BaseModel):
     response_format: str = "url"      # url | b64_json
     timeout: int | None = Field(default=None, ge=1, le=600)
     extra: str | None = None
+    mode: str | None = None
     image: Any = None
     images: list | None = None
     videos: list | None = None
@@ -588,6 +589,7 @@ class VideoRequest(BaseModel):
     fps: int | None = None
     timeout: int | None = None
     extra: str | None = None
+    mode: str | None = None
     image: Any = None
     images: list | None = None
     videos: list | None = None
@@ -1039,10 +1041,19 @@ def build_video_prompt(r: VideoRequest, kinds: list[str] | None = None) -> str:
     ar = (r.aspect_ratio or "").strip().lower()
     sz = (r.size or "").strip().lower()
     dur = r.duration or 6
+    mode = (r.mode or "").strip().lower()
+    is_strict = mode in ("strict", "strict_consistency", "consistency")
     refs = _video_references(r)
     has_ref = bool(refs)
     kinds = kinds or ["image"] * len(refs)
-    if any(k != "image" for k in kinds):
+    if is_strict and has_ref:
+        reference_instruction = (
+            f"【严格参考图一致性模式】必须以本次上传的 {len(refs)} 份参考素材（{_reference_legend(kinds)}）为唯一外观与实体基准："
+            "1）人物一致性：严格锁定参考图中人物的面部特征、五官、发型发色、肤色、体型与服装穿搭、配饰细节，全程不得换脸、变形或擅自更换服饰；"
+            "2）物品道具一致性：严格保持参考图中商品、道具、器物、图案文字与材质色彩的原貌比例，不得替换款式、改变配色或凭空增减结构；"
+            "3）场景与画风一致性：严格延续参考图中的环境空间、光影色调与视觉质感，禁止当作宽松灵感自由发挥或使用历史素材"
+        )
+    elif any(k != "image" for k in kinds):
         # 不再默认「第一张图作起始画面」：实测会把模型拉回图片场景、忽略参考视频
         reference_instruction = (
             f"基于我本次上传的参考素材（{_describe_kinds(kinds)}）生成视频"
@@ -1620,6 +1631,7 @@ async def _video_request_from_form(request: Request) -> VideoRequest:
         fps=_int(form.get("fps")),
         timeout=_int(form.get("timeout")),
         extra=str(form.get("extra") or "") or None,
+        mode=str(form.get("mode") or "") or None,
         images=await _files("images", "image[]", "image", "first_frame") or None,
         videos=await _files("videos", "video[]", "video") or None,
         audios=await _files("audios", "audio[]", "audio") or None,

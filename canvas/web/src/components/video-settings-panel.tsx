@@ -16,6 +16,7 @@ const resolutionOptions = [
 const videoModeOptions = [
     { value: "frames", labelKey: "frames" },
     { value: "reference", labelKey: "reference" },
+    { value: "strict", labelKey: "strict" },
 ];
 const fpsOptions = ["30", "48", "60"];
 
@@ -144,6 +145,7 @@ export function videoModeLabel(value: string) {
 }
 
 export function normalizeVideoModeValue(value: string | undefined) {
+    if (value === "strict") return "strict";
     return value === "reference" ? "reference" : "frames";
 }
 

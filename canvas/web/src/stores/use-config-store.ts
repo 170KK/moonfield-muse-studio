@@ -294,7 +294,7 @@ export const useConfigStore = create<ConfigStore>()(
                         videoFps: String(Math.max(30, Math.min(60, Math.floor(Number(config.videoFps) || 30)))),
                         videoGenerateAudio: config.videoGenerateAudio || "true",
                         videoWatermark: config.videoWatermark || "false",
-                        videoMode: config.videoMode === "reference" ? "reference" : "frames",
+                        videoMode: config.videoMode === "strict" ? "strict" : config.videoMode === "reference" ? "reference" : "frames",
                         canvasImageCount: config.canvasImageCount || "1",
                         proxyEnabled: Boolean(config.proxyEnabled),
                         proxyUrl: config.proxyUrl || DEFAULT_LOCAL_PROXY_URL,

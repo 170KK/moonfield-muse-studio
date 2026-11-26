@@ -330,6 +330,7 @@ function normalizeVideoSeconds(value: string) {
 }
 
 function resolveVideoMode(mode: string | undefined, imageCount: number) {
+    if (mode === "strict") return "strict";
     if (mode === "reference" || imageCount > 2) return "reference";
     return "frames";
 }
