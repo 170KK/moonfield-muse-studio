@@ -66,6 +66,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
     };
 
     const hasReferenceContext = connectedNodes.length > 0 || mentionReferences.length > 0;
+    const hasUpstreamVideo = connectedNodes.some((item) => item.type === CanvasNodeType.Video && Boolean(item.metadata?.content));
     const canSubmit = Boolean(prompt.trim()) || hasReferenceContext;
 
     const submit = () => {
@@ -133,7 +134,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                         className="min-w-0 flex-1 !px-0 !text-xs"
                         style={{ color: theme.node.text }}
                     />
-                    {mode === "video" ? (
+                    {mode === "video" && hasUpstreamVideo ? (
                         <>
                             <span className="h-3.5 w-px shrink-0 opacity-25" style={{ background: theme.node.text }} />
                             <Select
