@@ -2562,9 +2562,9 @@ async def test_account_video(aid: str, _=Depends(auth)):
                 engine.start()
                 res = engine.generate(
                     cur_acc["cookies"],
-                    "A gentle breeze over calm green grass, 3 seconds, 16:9, clean cinematic shot",
+                    "Generate a 4-second 16:9 live-action video: a gentle breeze over calm green grass in soft daylight",
                     expect="video",
-                    timeout=150,
+                    timeout=360,
                     expires=cur_acc.get("cookies_exp"),
                     account_id=aid,
                 )
@@ -2577,6 +2577,14 @@ async def test_account_video(aid: str, _=Depends(auth)):
                 return {"ok": False, "video_ok": False, "suggest_remove": True, "message": err_msg}
             except Exception as exc:  # noqa: BLE001
                 err_msg = str(exc)[:180] or type(exc).__name__
+                is_transient = any(k in err_msg.lower() for k in ("超时", "timeout", "timed out", "network", "connection", "reset", "aborted"))
+                if is_transient:
+                    return {
+                        "ok": False,
+                        "video_ok": acc.get("video_ok"),
+                        "suggest_remove": False,
+                        "message": f"测试等待超时或网络波动（不代表不能生视频，可直接正常使用）：{err_msg}",
+                    }
                 store.update_account(aid, video_ok=False, note=f"无法生成视频（建议剔除）: {err_msg[:100]}")
                 return {"ok": False, "video_ok": False, "suggest_remove": True, "message": err_msg}
 
