@@ -2637,6 +2637,8 @@ function InfiniteCanvasPage() {
         [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas, size.height, size.width],
     );
 
+    const insertAssistantImageRef = useRef<((asset: { id: string; prompt?: string; dataUrl: string; storageKey?: string }, options?: { position?: Position; keepSelection?: boolean }) => Promise<string>) | null>(null);
+
     const handleDrop = useCallback(
         (event: ReactDragEvent<HTMLDivElement>) => {
             event.preventDefault();
@@ -2671,7 +2673,7 @@ function InfiniteCanvasPage() {
                     } else {
                         const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
                         const nextSize = fitNodeSize(asset.width || spec.width, asset.height || spec.height, spec.width, spec.height);
-                        void insertAssistantImage(
+                        void insertAssistantImageRef.current?.(
                             { id: `asset-${Date.now()}`, prompt: asset.prompt || asset.id, dataUrl: asset.dataUrl, storageKey: asset.storageKey },
                             { position: { x: dropPos.x - nextSize.width / 2, y: dropPos.y - nextSize.height / 2 } },
                         );
@@ -2699,7 +2701,7 @@ function InfiniteCanvasPage() {
                 }
             }
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, insertAssistantImage, screenToCanvas],
+        [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas],
     );
 
     const startTitleEditing = useCallback(() => {
@@ -3814,6 +3816,8 @@ function InfiniteCanvasPage() {
         },
         [screenToCanvas, size.height, size.width],
     );
+
+    insertAssistantImageRef.current = insertAssistantImage;
 
     const handleAssetInsert = useCallback(
         async (payload: InsertAssetPayload, explicitTargetNodeId?: string) => {
