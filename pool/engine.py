@@ -1403,7 +1403,7 @@ class MuseEngine:
                 else:
                     refusal_last, refusal_stable = refusal, 0
                 if refusal_stable >= 4 and elapsed > 8.0:
-                    raise MuseModelRefusalError(f"模型未生成媒体，仅返回文本: {refusal}")
+                    raise MuseModelRefusalError(f"Muse 拒绝生成：{refusal}")
             else:
                 refusal_last, refusal_stable = "", 0
 
@@ -1472,10 +1472,10 @@ class MuseEngine:
 
     @classmethod
     def _media_refusal_text(cls, text: str, expect: str) -> str:
-        """Return only an explicit media refusal line, never an arbitrary page tail."""
+        """Return an explicit media/prompt refusal from Muse so the exact reason reaches the user."""
         if not text:
             return ""
-        patterns = [
+        region_patterns = [
             r"^(?:没生成成|视频没生成成功|视频未生成成功|视频生成失败)[^\n]{0,240}"
             r"(?:国家|地区|country|region)[^\n]{0,160}(?:不支持|不可用|无法|not available|unavailable|not supported)",
             r"^(?:could not|couldn't|cannot|can't|unable to)[^\n]{0,120}video[^\n]{0,160}"
@@ -1484,10 +1484,23 @@ class MuseEngine:
             r"^(?:图片没生成成功|图片未生成成功|图片生成失败|无法生成图片)",
             r"^(?:could not|couldn't|cannot|can't|unable to)[^\n]{0,120}image",
         ]
-        for line in reversed((text or "").splitlines()):
-            clean = cls._clean_model_text(line)
-            if clean and any(re.search(pattern, clean, re.I) for pattern in patterns):
-                return clean
+        prompt_refusal_pattern = re.compile(
+            r"(?:换个提示词|更换提示词|修改提示词|调整提示词|换一个提示词|换一种描述|请换[^\n]{0,12}(?:提示词|描述)|请修改[^\n]{0,12}(?:提示词|描述)|"
+            r"(?:抱歉|对不起|很抱歉)[^\n]{0,40}(?:无法|不能|未能)[^\n]{0,20}(?:生成|制作|创建|提供)|"
+            r"(?:无法|不能|拒绝|不适合)[^\n]{0,16}(?:为您)?(?:生成|制作|创建)[^\n]{0,20}(?:视频|图片|图像|内容)|"
+            r"(?:违反|不符合|触发)[^\n]{0,20}(?:安全|内容|使用|社区)?(?:政策|规范|准则|限制|审核)|"
+            r"content\s*policy|safety\s*(?:policy|guidelines)|inappropriate|try\s+a\s+different\s+prompt|modify\s+your\s+prompt|"
+            r"(?:cannot|can['’]t|unable\s+to|could\s+not|couldn['’]t)\s+(?:generat(?:e|ing)|creat(?:e|ing)|make)\s+(?:this|the|a)?\s*(?:video|image|content))",
+            re.I,
+        )
+        lines = [cls._clean_model_text(line, limit=500) for line in (text or "").splitlines()]
+        lines = [line for line in lines if line]
+        for line in reversed(lines):
+            if any(re.search(pattern, line, re.I) for pattern in region_patterns):
+                return line
+        if any(prompt_refusal_pattern.search(line) for line in lines):
+            joined = " ".join(lines[-4:])
+            return cls._clean_model_text(joined, limit=400)
         return ""
 
     # ---------------- 取字节 ----------------
